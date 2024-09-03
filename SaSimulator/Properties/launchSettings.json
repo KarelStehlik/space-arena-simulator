@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SaSimulator": {
+      "commandName": "Project",
+      "commandLineArgs": "-G"
+    }
+  }
+}
