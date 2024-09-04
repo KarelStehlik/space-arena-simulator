@@ -1,18 +1,15 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SaSimulator
 {
-    internal class Sprite
+    internal class Sprite(string textureName)
     {
-        private Texture2D texture;
+        private Texture2D? texture = MonoGameWindow.Instance.LoadTexture(textureName);
 
         public Vector2 Position { get; set; }
+
+        public Color Color { get; set; } = Color.White;
 
         public Vector2 Size
         {
@@ -26,6 +23,12 @@ namespace SaSimulator
             }
         }
 
+        public void setTransform(ref Transform t)
+        {
+            Position = new((float)t.x.Cells, (float)t.y.Cells);
+            Rotation = (float)t.rotation;
+        }
+
         private Vector2 size;
         private Vector2 origin;
         private Vector2 scale;
@@ -33,14 +36,11 @@ namespace SaSimulator
         public float Rotation { get; set; }
         public float Layer { get; set; }
 
-        public Sprite(Texture2D texture)
-        {
-            this.texture = texture;
-        }
-
         public void Draw(SpriteBatch batch)
         {
-            batch.Draw(texture, Position, null, Color.White, Rotation, origin, scale, SpriteEffects.None, Layer);
+            Camera camera = MonoGameWindow.Instance.camera;
+            batch.Draw(texture, (Position - camera.position) * camera.zoom,
+                null, Color, Rotation, origin, scale * camera.zoom, SpriteEffects.None, Layer);
         }
     }
 }

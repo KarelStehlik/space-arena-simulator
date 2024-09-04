@@ -1,11 +1,39 @@
 ﻿// This is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
+using System;
+using System.Numerics;
+
 namespace SaSimulator
 {
-    public struct Distance(float cells)
+    public readonly struct Transform
     {
-        public float Cells { get; set; } = cells;
+        public readonly Distance x, y;
+        public readonly double rotation;
+        public readonly Vector2 Position { get { return new((float)x.Cells, (float)y.Cells); } }
 
-        public override string ToString()
+        public Transform(Distance x, Distance y, double rotation)
+        {
+            this.x = x;
+            this.y = y;
+            this.rotation = rotation % (2 * Math.PI);
+            if (this.rotation < 0)
+            {
+                this.rotation += 2 * Math.PI;
+            }
+        }
+
+        // assume "second" is relative to "first". get its world position.
+        public static Transform operator +(Transform first, Transform second)
+        {
+            double cos = Math.Cos(first.rotation), sin = Math.Sin(first.rotation);
+            return new Transform(first.x + second.x * cos - second.y * sin, first.y + second.x * sin + second.y * cos, first.rotation + second.rotation);
+        }
+    }
+
+    public readonly struct Distance(double cells)
+    {
+        public readonly double Cells = cells;
+
+        public override readonly string ToString()
         {
             return Cells + " cells distance";
         }
@@ -14,7 +42,7 @@ namespace SaSimulator
         {
             return new(first.Cells + other.Cells);
         }
-        public static Distance operator *(Distance first, float other)
+        public static Distance operator *(Distance first, double other)
         {
             return new(first.Cells * other);
         }
@@ -22,7 +50,7 @@ namespace SaSimulator
         {
             return new(first.Cells - other.Cells);
         }
-        public static Distance operator /(Distance first, float other)
+        public static Distance operator /(Distance first, double other)
         {
             return new(first.Cells / other);
         }
@@ -32,11 +60,11 @@ namespace SaSimulator
         }
     }
 
-    public struct Speed(float value)
+    public readonly struct Speed(double value)
     {
-        public float CellsPerSecond { get; set; } = value;
+        public readonly double CellsPerSecond = value;
 
-        public override string ToString()
+        public override readonly string ToString()
         {
             return CellsPerSecond + "c/s speed";
         }
@@ -45,7 +73,7 @@ namespace SaSimulator
         {
             return new(first.CellsPerSecond + other.CellsPerSecond);
         }
-        public static Speed operator *(Speed first, float other)
+        public static Speed operator *(Speed first, double other)
         {
             return new(first.CellsPerSecond * other);
         }
@@ -53,7 +81,7 @@ namespace SaSimulator
         {
             return new(first.CellsPerSecond - other.CellsPerSecond);
         }
-        public static Speed operator /(Speed first, float other)
+        public static Speed operator /(Speed first, double other)
         {
             return new(first.CellsPerSecond / other);
         }
@@ -63,9 +91,9 @@ namespace SaSimulator
         }
     }
 
-    public class Time(float seconds)
+    public readonly struct Time(double seconds)
     {
-        public float Seconds { get; set; } = seconds;
+        public readonly double Seconds = seconds;
 
         public override string ToString()
         {
@@ -76,7 +104,7 @@ namespace SaSimulator
         {
             return new(first.Seconds + other.Seconds);
         }
-        public static Time operator *(Time first, float other)
+        public static Time operator *(Time first, double other)
         {
             return new(first.Seconds * other);
         }
@@ -84,7 +112,7 @@ namespace SaSimulator
         {
             return new(first.Seconds - other.Seconds);
         }
-        public static Time operator /(Time first, float other)
+        public static Time operator /(Time first, double other)
         {
             return new(first.Seconds / other);
         }
@@ -94,11 +122,7 @@ namespace SaSimulator
     {
         public static Distance Cells(this double value)
         {
-            return new((float)value);
-        }
-        public static Distance Cells(this float value)
-        {
-            return new(value);
+            return new((double)value);
         }
         public static Distance Cells(this int value)
         {
@@ -106,11 +130,7 @@ namespace SaSimulator
         }
         public static Speed CellsPerSecond(this double value)
         {
-            return new((float)value);
-        }
-        public static Speed CellsPerSecond(this float value)
-        {
-            return new(value);
+            return new((double)value);
         }
         public static Speed CellsPerSecond(this int value)
         {
@@ -118,11 +138,7 @@ namespace SaSimulator
         }
         public static Time Seconds(this double value)
         {
-            return new((float)value);
-        }
-        public static Time Seconds(this float value)
-        {
-            return new(value);
+            return new((double)value);
         }
         public static Time Seconds(this int value)
         {
