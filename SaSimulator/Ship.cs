@@ -1,7 +1,10 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
 using System.Reflection;
+using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
@@ -25,9 +28,10 @@ namespace SaSimulator
 
         private readonly Module[,] cells; // for each cell in this ship's grid, stores which module lies in this cell. Each module is stored here once for every cell it covers
         private readonly List<Module> modules = []; // stores each module once
+        private readonly int initialModuleNumber;
         private readonly int width = 0, height = 0; // in cells
         public readonly Distance outerDiameter, innerDiameter;
-        private readonly int side;
+        public readonly int side;
         private Speed acceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
         private float turnSpeed, turning = 0;
 
@@ -35,7 +39,7 @@ namespace SaSimulator
         public Ship(ShipInfo info, Game game, int side) : base(game)
         {
             this.side = side;
-            WorldPosition = side == 0 ? new(0.Cells(), 0.Cells(), 0) : new(10.Cells(), 10.Cells(), 0);
+            WorldPosition = side == 0 ? new(0.Cells(), 0.Cells(), 0) : new(100.Cells(), 10.Cells(), 0);
             acceleration = info.speed;
             turnSpeed = info.turnSpeed;
 
@@ -44,7 +48,7 @@ namespace SaSimulator
             {
                 // create the requested module
                 MethodInfo method = typeof(Modules).GetMethod(placement.module) ?? throw new ArgumentException($"No such module: {placement.module}");
-                Module module = (Module)method.Invoke(null, [this]);
+                Module module = method.Invoke(null, [this]) as Module;
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
                 modules.Add(module);
@@ -58,6 +62,7 @@ namespace SaSimulator
 
             innerDiameter = Math.Min(width, height).Cells();
             outerDiameter = Math.Max(width, height).Cells();
+            initialModuleNumber = modules.Count;
 
             // fill ship grid
             foreach (Module module in modules)
@@ -85,33 +90,54 @@ namespace SaSimulator
             return side == 0 ? game.player1Ships : game.player0Ships;
         }
 
+        private bool IsCriticallyDamaged()
+        {
+            return modules.Count < initialModuleNumber * 0.3;
+        }
+
         public override void Tick(Time dt)
         {
             Ship enemyMain = GetEnemies()[0];
 
-            // determine whether the enemy is to the left of this ship
-            float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
-            if (Physics.IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
+            // do movement
             {
-                turning += turnSpeed * (float)dt.Seconds;
+                // determine whether the enemy is to the left of this ship
+                float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
+                if (Physics.IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
+                {
+                    turning += turnSpeed * (float)dt.Seconds;
+                }
+                else
+                {
+                    turning -= turnSpeed * (float)dt.Seconds;
+                }
+
+                vx += acceleration * Math.Cos(WorldPosition.rotation) * dt.Seconds;
+                vy += acceleration * Math.Sin(WorldPosition.rotation) * dt.Seconds;
+
+                turning *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
+                vx *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
+                vy *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
+
+                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turning);
             }
-            else
+
+            // process damage taken
             {
-                turning -= turnSpeed * (float)dt.Seconds;
+                modules.RemoveAll(m => m.IsDestroyed);
+                if (IsCriticallyDamaged())
+                {
+                    IsDestroyed = true;
+                    return;
+                }
             }
 
-            vx += acceleration * Math.Cos(WorldPosition.rotation) * dt.Seconds;
-            vy += acceleration * Math.Sin(WorldPosition.rotation) * dt.Seconds;
-
-            turning *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
-            vx *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
-            vy *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
-
-            WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turning);
-            modules.RemoveAll(m => m.IsDestroyed);
-            foreach (Module module in modules)
+            // tick modules
             {
-                module.Tick(dt);
+                foreach (Module module in modules)
+                {
+                    module.Tick(dt);
+                }
             }
         }
 
@@ -121,6 +147,38 @@ namespace SaSimulator
             {
                 module.Draw(batch);
             }
+        }
+
+        public readonly struct ModuleHit(Module module, Vector2 position)
+        {
+            public readonly Module module = module;
+            public readonly Vector2 position = position;
+        }
+
+        // Enumerates modules in all cells hit by the given ray.
+        public IEnumerable<ModuleHit> RayIntersect(Transform rayOrigin, Distance rayLength)
+        {
+            // first, get the ray into the reference frame of this ship.
+            Transform ray = WorldPosition - rayOrigin;
+
+            // the lowest-coordinate corner of this ship
+            Vector2 lowestCorner = new((-width - 1) / 2f, (-height - 1) / 2f);
+            Vector2 step = new((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation));
+            Vector2 pos = ray.Position - lowestCorner;
+
+            // commence brute force temporary solution
+            for(int i=0;i<=rayLength.Cells;i++)
+            {
+                if(pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
+                {
+                    if (cells[(int)pos.X, (int)pos.Y] != null)
+                    {
+                        yield return new(cells[(int)pos.X, (int)pos.Y], WorldPosition + (pos+lowestCorner));
+                    }
+                }
+                pos += step;
+            }
+            yield break;
         }
     }
 }

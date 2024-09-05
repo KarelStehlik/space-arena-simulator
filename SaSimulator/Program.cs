@@ -15,6 +15,7 @@ namespace SaSimulator
         {
             ShipInfo a = new();
             a.modules.Add(new ModulePlacement("Test", 0, 0));
+            a.modules.Add(new ModulePlacement("Gun", 1, 3));
             ShipInfo b = new();
             b.modules.Add(new ModulePlacement("Test", 0, 0));
             b.modules.Add(new ModulePlacement("Test", 2, 0));

@@ -1,5 +1,8 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using System;
 using System.Collections.Generic;
+using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
@@ -13,7 +16,7 @@ namespace SaSimulator
         private float armor; // Armor reduces damage taken by a flat amount
         private float penetrationBlocking; // reduces damage of penetrating weapons by a percentage after hitting this. This is 0 for most modules
         private readonly List<IModuleComponent> components = [];
-        private readonly Ship ship;
+        public readonly Ship ship;
 
         public Module(int width, int height, string textureName, float maxLife, float armor, float penetrationBlocking, Ship ship) : base(ship.game)
         {
@@ -60,7 +63,7 @@ namespace SaSimulator
         public float TakeDamage(float amount)
         {
             life -= amount - armor;
-            if (life < 0)
+            if (life <= 0)
             {
                 IsDestroyed = true;
                 foreach (var component in components)
@@ -78,11 +81,46 @@ namespace SaSimulator
         void OnDestroyed(Module module);
     }
 
+    internal class Gun(Module module, Time cooldown, float maxAmmo, Distance range, Speed speed, float damage) : IModuleComponent
+    {
+        Time duration = range/speed;
+        float bulletsPerSecond = 1 / (float)cooldown.Seconds;
+        Distance range = range;
+        Speed speed = speed;
+        float damage = damage;
+        float maxAmmo = maxAmmo;
+        Module module = module;
+        float ammo = 0;
+
+        public void OnDestroyed(Module module)
+        {
+        }
+
+        public void Tick(Time dt, Module module)
+        {
+            ammo += (float)dt.Seconds * bulletsPerSecond;
+            ammo = ammo > maxAmmo ? maxAmmo : ammo;
+
+            while (ammo > 0)
+            {
+                ammo--;
+                double angle = module.WorldPosition.rotation;
+                module.game.AddObject(new Bullet(module.game, new(module.WorldPosition.x, module.WorldPosition.y, angle), speed, duration, damage, module.ship.side, new(1, 1, .2f, .5f)));
+            }
+        }
+    }
+
     internal static class Modules
     {
         public static Module Test(Ship ship)
         {
-            return new(2, 3, "boost", 100, 0, 0, ship);
+            return new(2, 3, "cell", 100, 0, 0, ship);
+        }
+        public static Module Gun(Ship ship)
+        {
+            Module gun = new(1, 1, "cell", 100, 0, 0, ship);
+            gun.AddComponent(new Gun(gun, 0.5.Seconds(), 10, 40.Cells(), 60.CellsPerSecond(), 10));
+            return gun;
         }
     }
 }

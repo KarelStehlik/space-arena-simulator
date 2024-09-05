@@ -1,34 +1,9 @@
-﻿// This is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
+﻿// A bunch of this is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
 using System;
 using System.Numerics;
 
 namespace SaSimulator
 {
-    public readonly struct Transform
-    {
-        public readonly Distance x, y;
-        public readonly double rotation;
-        public readonly Vector2 Position { get { return new((float)x.Cells, (float)y.Cells); } }
-
-        public Transform(Distance x, Distance y, double rotation)
-        {
-            this.x = x;
-            this.y = y;
-            this.rotation = rotation % (2 * Math.PI);
-            if (this.rotation < 0)
-            {
-                this.rotation += 2 * Math.PI;
-            }
-        }
-
-        // assume "second" is relative to "first". get its world position.
-        public static Transform operator +(Transform first, Transform second)
-        {
-            double cos = Math.Cos(first.rotation), sin = Math.Sin(first.rotation);
-            return new Transform(first.x + second.x * cos - second.y * sin, first.y + second.x * sin + second.y * cos, first.rotation + second.rotation);
-        }
-    }
-
     public readonly struct Distance(double cells)
     {
         public readonly double Cells = cells;
@@ -57,6 +32,10 @@ namespace SaSimulator
         public static Speed operator /(Distance first, Time other)
         {
             return new(first.Cells / other.Seconds);
+        }
+        public static Time operator /(Distance first, Speed other)
+        {
+            return new(first.Cells / other.CellsPerSecond);
         }
     }
 
