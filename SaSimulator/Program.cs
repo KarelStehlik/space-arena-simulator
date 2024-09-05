@@ -5,41 +5,37 @@ namespace SaSimulator
 {
     public class Options
     {
+        [Option('F', "file", Required = true, Default = false, HelpText = "File to lod ships from")]
+        public string File { get; set; }
         [Option('G', "graphics", Required = false, Default = false, HelpText = "Use graphics window to view the battle.")]
         public bool Graphics { get; set; }
+        [Option('S', "speed", Required = false, Default = 1, HelpText = "Game speed used when graphics are on. This does not affect the game result.")]
+        public double Gamespeed { get; set; }
+        [Option('D', "deltatime", Required = false, Default = 1 / 30f, HelpText = "Deltatime used to simulate lag. default non-laggy value is 1/30.")]
+        public double Deltatime { get; set; }
+        [Option('T', "timeout", Required = false, Default = 180, HelpText = "Time after which the battle is declared a draw to avoid long simulations. 0 to disable.")]
+        public double Timeout { get; set; }
+        [Option('N', "number", Required = false, Default = 180, HelpText = "Number of simulations to perform. Locked to 1 if graphics are on.")]
+        public int NumberSims { get; set; }
     }
 
     internal class Program
     {
         static void Main(Options o)
         {
-            ShipInfo a = new();
-            a.modules.Add(new ModulePlacement("Test", 0, 0));
-            a.modules.Add(new ModulePlacement("Gun", 1, 3));
-            ShipInfo b = new();
-            b.modules.Add(new ModulePlacement("Test", 0, 0));
-            b.modules.Add(new ModulePlacement("Test", 2, 0));
+            var file = FileLoading.Read(o.File);
+            var a = file.player0;
+            var b = file.player1;
+            Random rng = new();
 
-            Game? game = new([a], [b], o.Graphics, 60.Seconds());
             if (o.Graphics)
             {
+                Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? Double.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
                 Console.WriteLine("begin");
-                MonoGameWindow.Init(game);
+                MonoGameWindow.Init(game, (float)o.Gamespeed);
                 MonoGameWindow window = MonoGameWindow.Instance;
                 window.Run();
                 Console.WriteLine("end");
-            }
-            else
-            {
-                Console.WriteLine("Performing battle.");
-                game.Load();
-                while (game.result == Game.GameResult.unfinished)
-                {
-                    game.Tick(1.Seconds() / 30);
-                }
-            }
-            if (game != null)
-            {
                 switch (game.result)
                 {
                     case Game.GameResult.unfinished:
@@ -54,7 +50,34 @@ namespace SaSimulator
                         Console.WriteLine("draw");
                         break;
                 }
+                return;
             }
+
+            int win0 = 0, win1 = 0, draw = 0;
+            Console.WriteLine("simulating...");
+            for (int i = 0; i < o.NumberSims; i++)
+            {
+                Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? Double.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
+                game.Load();
+                while (game.result == Game.GameResult.unfinished)
+                {
+                    game.Tick();
+                }
+                switch (game.result)
+                {
+                    case Game.GameResult.win_0:
+                        win0++;
+                        break;
+                    case Game.GameResult.win_1:
+                        win1++;
+                        break;
+                    case Game.GameResult.draw:
+                        draw++;
+                        break;
+                }
+            }
+            Console.WriteLine($"Player 0 has {win0} wins, {draw} draws, {win1} losses.");
+            Console.WriteLine($"Winrate {win0 / (float)(win0 + win1) * 100:0.00}%");
         }
 
         static void Main(string[] args)

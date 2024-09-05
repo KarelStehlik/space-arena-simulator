@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Xna.Framework;
+using System;
 using static SaSimulator.Physics;
 using static SaSimulator.Ship;
 
@@ -14,23 +10,23 @@ namespace SaSimulator
     internal class BulletTrail : GameObject
     {
         readonly Sprite sprite;
-        Time duration = 0.2.Seconds();
+        Time duration = 0.1.Seconds();
 
         public BulletTrail(Game game, Vector2 from, Vector2 to, Color color) : base(game)
         {
             sprite = new("beam")
             {
-                Size = new Vector2(0.5f, Vector2.Distance(from, to)),
+                Size = new Vector2(0.2f, Vector2.Distance(from, to)),
                 Position = (from + to) / 2,
                 Color = color,
-                Rotation = (float)(Math.Atan2(to.Y - from.Y, to.X - from.X)+Math.PI/2)
+                Rotation = (float)(Math.Atan2(to.Y - from.Y, to.X - from.X) + Math.PI / 2)
             };
         }
 
         public override void Tick(Time dt)
         {
             duration -= dt;
-            if(duration.Seconds <= 0)
+            if (duration.Seconds <= 0)
             {
                 IsDestroyed = true;
             }
@@ -42,7 +38,7 @@ namespace SaSimulator
         }
     }
 
-    internal class Bullet : GameObject
+    internal class Projectile : GameObject
     {
         Speed speed, vx, vy;
         Time duration;
@@ -51,7 +47,7 @@ namespace SaSimulator
         Vector2 lastPosition;
         private readonly int side;
 
-        public Bullet(Game game, Transform transform, Speed speed, Time duration, float damage, int side, Color color) : base(game)
+        public Projectile(Game game, Transform transform, Speed speed, Time duration, float damage, int side, Color color) : base(game)
         {
             this.duration = duration;
             this.damage = damage;
@@ -67,21 +63,25 @@ namespace SaSimulator
         public override void Tick(Time dt)
         {
             var targets = side == 0 ? game.player1Ships : game.player0Ships;
-            foreach(var target in targets)
+            foreach (var target in targets)
             {
                 foreach (ModuleHit module in target.RayIntersect(WorldPosition, speed * dt))
                 {
-                    if (!module.module.IsDestroyed)
+                    IsDestroyed = true;
+                    if (game.hasGraphics)
                     {
-                        module.module.TakeDamage(damage);
-                        IsDestroyed = true;
-                        if (game.hasGraphics)
-                        {
-                            WorldPosition = new(((double)module.position.X).Cells(), ((double)module.position.Y).Cells(), WorldPosition.rotation);
-                            DrawTrail();
-                        }
-                        return;
+                        WorldPosition = new(((double)module.position.X).Cells(), ((double)module.position.Y).Cells(), WorldPosition.rotation);
+                        DrawTrail();
                     }
+                    if (module.module.IsDestroyed)
+                    {
+                        target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Ballistics);
+                    }
+                    else
+                    {
+                        module.module.TakeDamage(damage, DamageType.Ballistics);
+                    }
+                    return;
                 }
             }
             duration -= dt;
@@ -93,7 +93,7 @@ namespace SaSimulator
                     DrawTrail();
                 }
             }
-            WorldPosition = new(WorldPosition.x+vx*dt, WorldPosition.y+vy*dt, WorldPosition.rotation);
+            WorldPosition = new(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation);
         }
 
         private void DrawTrail()
@@ -104,7 +104,61 @@ namespace SaSimulator
 
         public override void Draw(SpriteBatch batch)
         {
-            if(IsDestroyed) return;
+            if (IsDestroyed) return;
+            DrawTrail();
+        }
+    }
+
+
+    internal class Laser(Game game, Transform transform, Distance length, float damage, int side, Color color) : GameObject(game)
+    {
+        Vector2 lastPosition = transform.Position;
+
+        public override void Tick(Time dt)
+        {
+            var targets = side == 0 ? game.player1Ships : game.player0Ships;
+            foreach (var target in targets)
+            {
+                foreach (ModuleHit module in target.RayIntersect(transform, length))
+                {
+                    if (game.hasGraphics)
+                    {
+                        WorldPosition = new(((double)module.position.X).Cells(), ((double)module.position.Y).Cells(), transform.rotation);
+                        DrawTrail();
+                    }
+                    if (module.module.IsDestroyed)
+                    {
+                        target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Ballistics);
+                    }
+                    else
+                    {
+                        module.module.TakeDamage(damage, DamageType.Ballistics);
+                    }
+                    IsDestroyed = true;
+                    return;
+                }
+            }
+
+            if (game.hasGraphics)
+            {
+                transform += new Transform(length, 0.Cells(), 0);
+                DrawTrail();
+            }
+            IsDestroyed = true;
+        }
+
+        private void DrawTrail()
+        {
+            if (IsDestroyed)
+            {
+                return;
+            }
+            game.AddObject(new BulletTrail(game, lastPosition, WorldPosition.Position, color));
+            lastPosition = WorldPosition.Position;
+        }
+
+        public override void Draw(SpriteBatch batch)
+        {
             DrawTrail();
         }
     }

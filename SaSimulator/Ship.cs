@@ -1,7 +1,6 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using static SaSimulator.Physics;
@@ -11,24 +10,29 @@ namespace SaSimulator
     internal class ModulePlacement(string module, int x, int y)
     {
         public readonly string module = module;
-        public readonly int x = x, y = y;
+        // this is janky, but not a typo.
+        // The space arena ship builder has the ship pointing upwards, so a player might expect the ship's front to be in the positive Y direction.
+        // However, it made more sense for me to have the ship facing forward so from its reference frame "forward" would be positive X, that is angle 0.
+        // This conversion happens here.
+        public readonly int x = y, y = x;
     }
     // ShipInfo describes the layout of a ship and all modules on it, as well as their stat modifiers.
     internal class ShipInfo
     {
         public Speed speed = 1.CellsPerSecond();
-        public float turnSpeed = 1;
+        public float turnSpeed = 0.1f;
         public List<ModulePlacement> modules = [];
     }
 
     internal class Ship : GameObject
     {
         private readonly float MOVEMENT_DAMPENING = 0.8f;
-        private readonly float ROTATION_DAMPENING = 0.2f;
+        private readonly float ROTATION_DAMPENING = 0.1f;
 
         private readonly Module[,] cells; // for each cell in this ship's grid, stores which module lies in this cell. Each module is stored here once for every cell it covers
         private readonly List<Module> modules = []; // stores each module once
         private readonly int initialModuleNumber;
+        public int modulesAlive;
         private readonly int width = 0, height = 0; // in cells
         public readonly Distance outerDiameter, innerDiameter;
         public readonly int side;
@@ -39,7 +43,8 @@ namespace SaSimulator
         public Ship(ShipInfo info, Game game, int side) : base(game)
         {
             this.side = side;
-            WorldPosition = side == 0 ? new(0.Cells(), 0.Cells(), 0) : new(100.Cells(), 10.Cells(), 0);
+            WorldPosition = side == 0 ? new(0.Cells(), 100.Cells(), -Math.PI / 2) : new(50.Cells(), 0.Cells(), Math.PI / 2);
+            WorldPosition += new Transform(game.rng.Next(5).Cells(), game.rng.Next(50).Cells(), 0);
             acceleration = info.speed;
             turnSpeed = info.turnSpeed;
 
@@ -62,7 +67,7 @@ namespace SaSimulator
 
             innerDiameter = Math.Min(width, height).Cells();
             outerDiameter = Math.Max(width, height).Cells();
-            initialModuleNumber = modules.Count;
+            initialModuleNumber = modulesAlive = modules.Count;
 
             // fill ship grid
             foreach (Module module in modules)
@@ -81,8 +86,28 @@ namespace SaSimulator
                     }
                 }
                 // set module position relative to ship centre
-                module.relativePosition += new Transform((-width).Cells() / 2, (-height).Cells() / 2, 0);
+                module.relativePosition += new Transform((-width + module.width).Cells() / 2, (-height + module.height).Cells() / 2, 0);
             }
+        }
+
+        public Module GetNearestModule(Vector2 worldPosition)
+        {
+            Module? best = null;
+            float bestDistance = float.PositiveInfinity;
+            foreach (Module module in modules)
+            {
+                if (module.IsDestroyed)
+                {
+                    continue;
+                }
+                float dist = Vector2.DistanceSquared(worldPosition, module.WorldPosition.Position);
+                if (dist < bestDistance)
+                {
+                    best = module;
+                    bestDistance = dist;
+                }
+            }
+            return best;
         }
 
         public List<Ship> GetEnemies()
@@ -92,7 +117,7 @@ namespace SaSimulator
 
         private bool IsCriticallyDamaged()
         {
-            return modules.Count < initialModuleNumber * 0.3;
+            return modulesAlive < initialModuleNumber * 0.3;
         }
 
         public override void Tick(Time dt)
@@ -124,7 +149,6 @@ namespace SaSimulator
 
             // process damage taken
             {
-                modules.RemoveAll(m => m.IsDestroyed);
                 if (IsCriticallyDamaged())
                 {
                     IsDestroyed = true;
@@ -145,6 +169,10 @@ namespace SaSimulator
         {
             foreach (Module module in modules)
             {
+                module.DrawOutline(batch);
+            }
+            foreach (Module module in modules)
+            {
                 module.Draw(batch);
             }
         }
@@ -162,18 +190,18 @@ namespace SaSimulator
             Transform ray = WorldPosition - rayOrigin;
 
             // the lowest-coordinate corner of this ship
-            Vector2 lowestCorner = new((-width - 1) / 2f, (-height - 1) / 2f);
+            Vector2 lowestCorner = new(-width / 2f, -height / 2f);
             Vector2 step = new((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation));
             Vector2 pos = ray.Position - lowestCorner;
 
             // commence brute force temporary solution
-            for(int i=0;i<=rayLength.Cells;i++)
+            for (int i = 0; i <= rayLength.Cells; i++)
             {
-                if(pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
+                if (pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
                 {
                     if (cells[(int)pos.X, (int)pos.Y] != null)
                     {
-                        yield return new(cells[(int)pos.X, (int)pos.Y], WorldPosition + (pos+lowestCorner));
+                        yield return new(cells[(int)pos.X, (int)pos.Y], WorldPosition + (pos + lowestCorner));
                     }
                 }
                 pos += step;

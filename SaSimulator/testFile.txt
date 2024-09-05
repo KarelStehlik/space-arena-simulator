@@ -1,0 +1,11 @@
+// some global info
+--- new player ---
+// some player info
+--- new ship ---
+1 0.2
+Chaingun 1 1 1 2 1 3 1 4
+--- new player ---
+// some player info
+--- new ship ---
+1 0.2
+Chaingun 1 1 1 2 1 3 1 4

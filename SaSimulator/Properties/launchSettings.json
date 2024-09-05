@@ -2,7 +2,7 @@
   "profiles": {
     "SaSimulator": {
       "commandName": "Project",
-      "commandLineArgs": "-G"
+      "commandLineArgs": "-F testFile.txt\r\n-G\r\n-S 1\r\n-N 100"
     }
   }
 }

@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace SaSimulator
 {
     internal static class Physics
     {
-        // Angle between [the vector from the origin to the point] and [the first angle]
+        // Angle between the 2 angles, normalized to 0-2PI
         private static float RelativeAngle(float firstAngle, float secondAngle)
         {
             return (float)((secondAngle - firstAngle + 4 * Math.PI) % (2 * Math.PI));
@@ -20,15 +19,30 @@ namespace SaSimulator
             return rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2;
         }
 
+        public static bool ConeCircleIntersect(Vector2 circleCentre, float circleRadius, Vector2 coneOrigin, float coneRotation, float coneAngle)
+        {
+            Vector2 difference = circleCentre - coneOrigin;
+            float angle = (float)Math.Atan2(difference.Y, difference.X);
+            float rel = RelativeAngle(angle, coneRotation);
+            if (rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2) // circle centre is in cone
+            {
+                return true;
+            }
+            float dist = Vector2.Distance(circleCentre, coneOrigin);
+            float angleOfClosestEdgeToCircle = Math.Min(RelativeAngle(angle, coneRotation + coneAngle), RelativeAngle(angle, coneRotation - coneAngle));
+            return dist * Math.Abs(Math.Sin(angleOfClosestEdgeToCircle)) < circleRadius;
+
+        }
+
         // clamp an angle so that it differs by at most [maxDeviation] from [middle]
         public static float ClampAngle(float angle, float middle, float maxDeviation)
         {
             float rel = RelativeAngle(middle, angle);
-            if(rel<maxDeviation || rel > 2 * Math.PI - maxDeviation)
+            if (rel < maxDeviation || rel > 2 * Math.PI - maxDeviation)
             {
                 return angle;
             }
-            return rel>0? middle+maxDeviation : middle-maxDeviation;
+            return rel > 0 ? middle + maxDeviation : middle - maxDeviation;
         }
 
         public readonly struct Transform
@@ -49,7 +63,8 @@ namespace SaSimulator
             }
 
             // assume[vector] is relative to[transform], and its units are cells. get its world position.
-            public static Vector2 operator +(Transform transform, Vector2 vector){
+            public static Vector2 operator +(Transform transform, Vector2 vector)
+            {
                 float cos = (float)Math.Cos(transform.rotation), sin = (float)Math.Sin(transform.rotation);
                 return new((float)transform.x.Cells + vector.X * cos - vector.Y * sin, (float)transform.y.Cells + vector.X * sin + vector.Y * cos);
             }

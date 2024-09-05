@@ -1,6 +1,5 @@
 ﻿// A bunch of this is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
 using System;
-using System.Numerics;
 
 namespace SaSimulator
 {
@@ -122,6 +121,22 @@ namespace SaSimulator
         public static Time Seconds(this int value)
         {
             return new(value);
+        }
+        public static float ToDegrees(this float radians)
+        {
+            return (float)(radians * 180 / Math.PI);
+        }
+        public static double ToDegrees(this double radians)
+        {
+            return (radians * 180 / Math.PI);
+        }
+        public static float ToRadians(this float degrees)
+        {
+            return (float)(degrees / 180 * Math.PI);
+        }
+        public static double ToRadians(this double degrees)
+        {
+            return (degrees / 180 * Math.PI);
         }
     }
 }

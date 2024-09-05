@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -16,15 +17,19 @@ namespace SaSimulator
         public virtual void Draw(SpriteBatch batch) { }
     }
 
-    internal class Game(List<ShipInfo> player0, List<ShipInfo> player1, bool hasGraphics, Time timeout)
+    internal class Game(List<ShipInfo> player0, List<ShipInfo> player1, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
     {
+        public readonly Time deltatime = deltatime;
         public readonly bool hasGraphics = hasGraphics;
         public enum GameResult { win_0, win_1, draw, unfinished };
         public GameResult result { get; private set; } = GameResult.unfinished;
         public readonly List<Ship> player0Ships = [], player1Ships = [];
         private readonly List<GameObject> gameObjects = [], newGameObjects = [];
         private readonly List<ShipInfo> player0 = player0, player1 = player1;
-        private Time time = 0.Seconds(), timeout = timeout;
+        public Time time { get; private set; } = 0.Seconds();
+        public readonly Time timeout = timeout;
+        public readonly Random rng = new(randomSeed);
+        public float DamageScaling { get; private set; } = 1; // According to Discord, all damage increases by 3% per second starting at 25 seconds
 
         public void Load()
         {
@@ -46,6 +51,10 @@ namespace SaSimulator
         public RectangleF GetBounds()
         {
             IEnumerable<Ship> allShips = player0Ships.AsEnumerable().Concat(player1Ships);
+            if (!allShips.Any())
+            {
+                return new(1, 1, 1, 1);
+            }
             float minX = allShips.Select(go => (float)(go.WorldPosition.x - go.outerDiameter / 2).Cells).Min();
             float maxX = allShips.Select(go => (float)(go.WorldPosition.x + go.outerDiameter / 2).Cells).Max();
             float minY = allShips.Select(go => (float)(go.WorldPosition.y - go.outerDiameter / 2).Cells).Min();
@@ -61,14 +70,16 @@ namespace SaSimulator
 
         // dt should be used to simulate lag, which affects certain game mechanics in Space Arena.
         // A reasonable value for lag-free gameplay is 1/30 seconds
-        public void Tick(Time dt)
+        public void Tick()
         {
-            time += dt;
+            time += deltatime;
             if (time.Seconds > timeout.Seconds)
             {
                 result = GameResult.draw;
                 return;
             }
+            DamageScaling = 1 + (float)(time.Seconds > 25 ? ((time.Seconds - 25) * 0.03) : 0);
+
             // detect if a player has won
             player0Ships.RemoveAll(ship => ship.IsDestroyed);
             player1Ships.RemoveAll(ship => ship.IsDestroyed);
@@ -93,7 +104,7 @@ namespace SaSimulator
             // game tick
             foreach (GameObject obj in gameObjects)
             {
-                obj.Tick(dt);
+                obj.Tick(deltatime);
             }
         }
 

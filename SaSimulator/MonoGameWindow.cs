@@ -20,10 +20,12 @@ namespace SaSimulator
         private GraphicsDeviceManager _graphics;
         private SpriteBatch? _spriteBatch;
         private Game game;
+        private float gamespeeed;
+        private Time desiredGameTime = 0.Seconds();
 
-        public static void Init(Game game)
+        public static void Init(Game game, float gamespeed)
         {
-            _instance = new(game);
+            _instance = new(game, gamespeed);
         }
 
         public static MonoGameWindow Instance
@@ -38,8 +40,9 @@ namespace SaSimulator
             }
         }
 
-        private MonoGameWindow(Game game)
+        private MonoGameWindow(Game game, float gamespeed)
         {
+            this.gamespeeed = gamespeed;
             this.game = game;
             _graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
@@ -69,9 +72,13 @@ namespace SaSimulator
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape) || game.result != Game.GameResult.unfinished)
                 Exit();
 
-            game.Tick(1.Seconds() / 30);
-
             base.Update(gameTime);
+
+            desiredGameTime += gameTime.ElapsedGameTime.TotalSeconds.Seconds() * gamespeeed;
+            while (game.time.Seconds < desiredGameTime.Seconds)
+            {
+                game.Tick();
+            }
         }
 
 
@@ -81,9 +88,25 @@ namespace SaSimulator
 
             _spriteBatch.Begin();
 
+            // zoom and centre the camera
+            float cameraClearance = 10;
             RectangleF bounds = game.GetBounds();
-            camera.position = new(bounds.Left, bounds.Top);
-            camera.zoom = Math.Min(Window.ClientBounds.Width / bounds.Width, Window.ClientBounds.Height / bounds.Height);
+            bounds = new(bounds.Left - cameraClearance, bounds.Top - cameraClearance, bounds.Width + 2 * cameraClearance, bounds.Height + 2 * cameraClearance);
+
+            float maxZoomX = Window.ClientBounds.Width / bounds.Width;
+            float maxZoomY = Window.ClientBounds.Height / bounds.Height;
+
+            if (maxZoomX > maxZoomY)
+            {
+                camera.zoom = maxZoomY;
+                camera.position = new(bounds.Left - (Window.ClientBounds.Width / maxZoomY - bounds.Width) / 2, bounds.Top);
+            }
+            else
+            {
+                camera.zoom = maxZoomX;
+                camera.position = new(bounds.Left, bounds.Top - (Window.ClientBounds.Height / maxZoomX - bounds.Height) / 2);
+            }
+
             game.Draw(_spriteBatch);
 
             _spriteBatch.End();

@@ -4,9 +4,9 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
-    internal class Sprite(string textureName)
+    internal class Sprite
     {
-        private Texture2D? texture = MonoGameWindow.Instance.LoadTexture(textureName);
+        private Texture2D? texture;
 
         public Vector2 Position { get; set; }
 
@@ -18,7 +18,6 @@ namespace SaSimulator
             set
             {
                 size = value;
-                origin = size / 2;
                 scale.X = size.X / texture.Width;
                 scale.Y = size.Y / texture.Height;
             }
@@ -33,6 +32,12 @@ namespace SaSimulator
         private Vector2 size;
         private Vector2 origin;
         private Vector2 scale;
+
+        public Sprite(string textureName)
+        {
+            texture = MonoGameWindow.Instance.LoadTexture(textureName);
+            origin = new(texture.Width / 2, texture.Height / 2);
+        }
 
         public float Rotation { get; set; }
         public float Layer { get; set; }
