@@ -96,6 +96,7 @@ namespace SaSimulator
             {
                 life -= amount * game.DamageScaling - armor;
             }
+
             if (life <= 0)
             {
                 IsDestroyed = true;

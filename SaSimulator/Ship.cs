@@ -191,11 +191,13 @@ namespace SaSimulator
 
             // the lowest-coordinate corner of this ship
             Vector2 lowestCorner = new(-width / 2f, -height / 2f);
-            Vector2 step = new((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation));
+
+            float stepSize = 0.5f;
+            Vector2 step = new Vector2((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation))*stepSize;
             Vector2 pos = ray.Position - lowestCorner;
 
             // commence brute force temporary solution
-            for (int i = 0; i <= rayLength.Cells; i++)
+            for (int i = 0; i*stepSize <= rayLength.Cells; i++)
             {
                 if (pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
                 {

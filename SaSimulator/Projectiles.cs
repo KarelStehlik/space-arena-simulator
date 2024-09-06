@@ -10,10 +10,10 @@ namespace SaSimulator
     internal class BulletTrail : GameObject
     {
         readonly Sprite sprite;
-        Time duration = 0.1.Seconds();
 
-        public BulletTrail(Game game, Vector2 from, Vector2 to, Color color) : base(game)
+        public BulletTrail(Game game, Vector2 from, Vector2 to, Color color, Time duration) : base(game)
         {
+            this.duration = duration;
             sprite = new("beam")
             {
                 Size = new Vector2(0.2f, Vector2.Distance(from, to)),
@@ -98,7 +98,7 @@ namespace SaSimulator
 
         private void DrawTrail()
         {
-            game.AddObject(new BulletTrail(game, lastPosition, WorldPosition.Position, color));
+            game.AddObject(new BulletTrail(game, lastPosition, WorldPosition.Position, color, 0.1.Seconds()));
             lastPosition = WorldPosition.Position;
         }
 
@@ -128,11 +128,11 @@ namespace SaSimulator
                     }
                     if (module.module.IsDestroyed)
                     {
-                        target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Ballistics);
+                        target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Laser);
                     }
                     else
                     {
-                        module.module.TakeDamage(damage, DamageType.Ballistics);
+                        module.module.TakeDamage(damage, DamageType.Laser);
                     }
                     IsDestroyed = true;
                     return;
@@ -153,7 +153,7 @@ namespace SaSimulator
             {
                 return;
             }
-            game.AddObject(new BulletTrail(game, lastPosition, WorldPosition.Position, color));
+            game.AddObject(new BulletTrail(game, lastPosition, WorldPosition.Position, color, 0.01.Seconds()));
             lastPosition = WorldPosition.Position;
         }
 
