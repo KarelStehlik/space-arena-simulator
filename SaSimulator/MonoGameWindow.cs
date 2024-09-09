@@ -74,7 +74,7 @@ namespace SaSimulator
 
             base.Update(gameTime);
 
-            desiredGameTime += gameTime.ElapsedGameTime.TotalSeconds.Seconds() * gamespeeed;
+            desiredGameTime += ((float)gameTime.ElapsedGameTime.TotalSeconds).Seconds() * gamespeeed;
             while (game.time.Seconds < desiredGameTime.Seconds)
             {
                 game.Tick();

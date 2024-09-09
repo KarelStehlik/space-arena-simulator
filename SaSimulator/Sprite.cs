@@ -6,7 +6,7 @@ namespace SaSimulator
 {
     internal class Sprite
     {
-        private Texture2D? texture;
+        private readonly Texture2D texture;
 
         public Vector2 Position { get; set; }
 
@@ -23,10 +23,10 @@ namespace SaSimulator
             }
         }
 
-        public void setTransform(ref Transform t)
+        public void SetTransform(ref Transform t)
         {
-            Position = new((float)t.x.Cells, (float)t.y.Cells);
-            Rotation = (float)t.rotation;
+            Position = new(t.x.Cells, t.y.Cells);
+            Rotation = t.rotation;
         }
 
         private Vector2 size;

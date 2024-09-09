@@ -37,23 +37,23 @@ namespace SaSimulator
         public readonly Distance outerDiameter, innerDiameter;
         public readonly int side;
         private Speed acceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
-        private float turnSpeed, turning = 0;
+        private float turnPower, turningVelocity = 0;
 
 
         public Ship(ShipInfo info, Game game, int side) : base(game)
         {
             this.side = side;
-            WorldPosition = side == 0 ? new(0.Cells(), 100.Cells(), -Math.PI / 2) : new(50.Cells(), 0.Cells(), Math.PI / 2);
+            WorldPosition = side == 0 ? new(0.Cells(), 100.Cells(), -(float)Math.PI / 2) : new(50.Cells(), 0.Cells(), (float)Math.PI / 2);
             WorldPosition += new Transform(game.rng.Next(5).Cells(), game.rng.Next(50).Cells(), 0);
             acceleration = info.speed;
-            turnSpeed = info.turnSpeed;
+            turnPower = info.turnSpeed;
 
             // First, we create the modules
             foreach (ModulePlacement placement in info.modules)
             {
                 // create the requested module
                 MethodInfo method = typeof(Modules).GetMethod(placement.module) ?? throw new ArgumentException($"No such module: {placement.module}");
-                Module module = method.Invoke(null, [this]) as Module;
+                Module module = method.Invoke(null, [this]) as Module ?? throw new ArgumentException($"Unable to create module: {placement.module}");
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
                 modules.Add(module);
@@ -67,6 +67,7 @@ namespace SaSimulator
 
             innerDiameter = Math.Min(width, height).Cells();
             outerDiameter = Math.Max(width, height).Cells();
+            size = outerDiameter / 2;
             initialModuleNumber = modulesAlive = modules.Count;
 
             // fill ship grid
@@ -90,7 +91,7 @@ namespace SaSimulator
             }
         }
 
-        public Module GetNearestModule(Vector2 worldPosition)
+        public Module? GetNearestModule(Vector2 worldPosition)
         {
             Module? best = null;
             float bestDistance = float.PositiveInfinity;
@@ -112,7 +113,7 @@ namespace SaSimulator
 
         public List<Ship> GetEnemies()
         {
-            return side == 0 ? game.player1Ships : game.player0Ships;
+            return side == 0 ? game.player1.ships : game.player0.ships;
         }
 
         private bool IsCriticallyDamaged()
@@ -130,21 +131,21 @@ namespace SaSimulator
                 float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
                 if (Physics.IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
                 {
-                    turning += turnSpeed * (float)dt.Seconds;
+                    turningVelocity += turnPower * (float)dt.Seconds;
                 }
                 else
                 {
-                    turning -= turnSpeed * (float)dt.Seconds;
+                    turningVelocity -= turnPower * (float)dt.Seconds;
                 }
 
-                vx += acceleration * Math.Cos(WorldPosition.rotation) * dt.Seconds;
-                vy += acceleration * Math.Sin(WorldPosition.rotation) * dt.Seconds;
+                vx += acceleration * (float)Math.Cos(WorldPosition.rotation) * dt.Seconds;
+                vy += acceleration * (float)Math.Sin(WorldPosition.rotation) * dt.Seconds;
 
-                turning *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
+                turningVelocity *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
                 vx *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
                 vy *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
 
-                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turning);
+                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity*dt.Seconds);
             }
 
             // process damage taken

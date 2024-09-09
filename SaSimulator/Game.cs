@@ -10,11 +10,17 @@ namespace SaSimulator
     internal class GameObject(Game game)
     {
         public Transform WorldPosition;
+        public Distance size = 0.Cells(); // approximate distance from centre to edge of bounding box
         public readonly Game game = game;
 
         public bool IsDestroyed { get; protected set; }
         public virtual void Tick(Time dt) { }
         public virtual void Draw(SpriteBatch batch) { }
+    }
+
+    internal class Player
+    {
+        public readonly List<Ship> ships = [];
     }
 
     internal class Game(List<ShipInfo> player0, List<ShipInfo> player1, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
@@ -23,26 +29,26 @@ namespace SaSimulator
         public readonly bool hasGraphics = hasGraphics;
         public enum GameResult { win_0, win_1, draw, unfinished };
         public GameResult result { get; private set; } = GameResult.unfinished;
-        public readonly List<Ship> player0Ships = [], player1Ships = [];
+        public readonly Player player0=new(), player1=new();
         private readonly List<GameObject> gameObjects = [], newGameObjects = [];
-        private readonly List<ShipInfo> player0 = player0, player1 = player1;
+        private readonly List<ShipInfo> player0ShipList = player0, player1ShipList = player1;
         public Time time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
-        public float DamageScaling { get; private set; } = 1; // According to Discord, all damage increases by 3% per second starting at 25 seconds
+        public float DamageScaling { get; private set; } = 1; // According to Discord, all damage increases by 3% per second starting at 25 seconds.
 
         public void Load()
         {
-            foreach (ShipInfo shipInfo in player0)
+            foreach (ShipInfo shipInfo in player0ShipList)
             {
                 Ship ship = new(shipInfo, this, 0);
-                player0Ships.Add(ship);
+                player0.ships.Add(ship);
                 gameObjects.Add(ship);
             }
-            foreach (ShipInfo shipInfo in player1)
+            foreach (ShipInfo shipInfo in player1ShipList)
             {
                 Ship ship = new(shipInfo, this, 1);
-                player1Ships.Add(ship);
+                player1.ships.Add(ship);
                 gameObjects.Add(ship);
             }
         }
@@ -50,7 +56,7 @@ namespace SaSimulator
         // Bounds of all ships in game. Does not include projectiles.
         public RectangleF GetBounds()
         {
-            IEnumerable<Ship> allShips = player0Ships.AsEnumerable().Concat(player1Ships);
+            IEnumerable<Ship> allShips = player0.ships.AsEnumerable().Concat(player1.ships);
             if (!allShips.Any())
             {
                 return new(1, 1, 1, 1);
@@ -81,14 +87,14 @@ namespace SaSimulator
             DamageScaling = 1 + (float)(time.Seconds > 25 ? ((time.Seconds - 25) * 0.03) : 0);
 
             // detect if a player has won
-            player0Ships.RemoveAll(ship => ship.IsDestroyed);
-            player1Ships.RemoveAll(ship => ship.IsDestroyed);
-            if (player0Ships.Count == 0)
+            player0.ships.RemoveAll(ship => ship.IsDestroyed);
+            player1.ships.RemoveAll(ship => ship.IsDestroyed);
+            if (player0.ships.Count == 0)
             {
-                result = player1Ships.Count == 0 ? GameResult.draw : GameResult.win_1;
+                result = player1.ships.Count == 0 ? GameResult.draw : GameResult.win_1;
                 return;
             }
-            if (player1Ships.Count == 0)
+            if (player1.ships.Count == 0)
             {
                 result = GameResult.win_0;
                 return;

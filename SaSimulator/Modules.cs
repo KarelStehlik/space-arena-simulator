@@ -2,10 +2,22 @@
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
+    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine }
+    enum StatType { Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range, FiringArc, Thrust, TurnThrust }
+    // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
+    internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
+    {
+        public readonly StatType stat = stat;
+        public float multiplier = multiplier;
+        public readonly ModuleTag targetModule = targetModule;
+    }
+
     enum DamageType { Ballistics, Explosive, Laser };
 
     // A ship is made of rectangular modules arranged on a square grid.
@@ -15,22 +27,29 @@ namespace SaSimulator
         public Transform relativePosition; // relative to ship centre
         private readonly Sprite? sprite;
         private readonly Sprite? outline;
-        private float life, maxLife;
-        private float armor; // reduces non-laser damage taken by a flat amount
-        private float reflect; // reduces laser damage by a percentage
-        private float penetrationBlocking; // reduces damage of penetrating weapons by a percentage after hitting this. This is 0 for most modules
-        private readonly List<IModuleComponent> components = [];
+        private float currentHealthFraction = 1;
+        private Attribute<float> maxHealth;
+        private Attribute<float> armor; // reduces non-laser damage taken by a flat amount
+        private Attribute<float> reflect; // reduces laser damage by a fraction
+        private Attribute<float> powerUse;
+        private Attribute<float> powerGen;
+        private Attribute<float> mass;
+        private readonly float penetrationBlocking; // reduces damage of penetrating weapons by a fraction after hitting this. This is 0 for most modules
+        public readonly List<IModuleComponent> components = [];
         public readonly Ship ship;
 
-        public Module(int width, int height, string textureName, float maxLife, float armor, float penetrationBlocking, float reflect, Ship ship) : base(ship.game)
+        public Module(int height, int width, string textureName, float maxLife, float armor, float penetrationBlocking, float reflect, float powerUse, float powerGen, float mass, Ship ship) : base(ship.game)
         {
             this.width = width;
             this.height = height;
-            this.armor = armor;
+            this.armor = new(armor);
             this.penetrationBlocking = penetrationBlocking;
             this.ship = ship;
-            this.reflect = reflect;
-            life = this.maxLife = maxLife;
+            this.reflect = new(reflect);
+            this.maxHealth = new(maxLife);
+            this.powerUse = new(powerUse);
+            this.powerGen = new(powerGen);
+            this.mass = new(mass);
             if (game.hasGraphics)
             {
                 sprite = new(textureName)
@@ -54,15 +73,26 @@ namespace SaSimulator
 
         public void DrawOutline(SpriteBatch batch)
         {
-            outline.setTransform(ref WorldPosition);
+#if DEBUG
+            if(outline==null)
+            {
+                throw new Exception("Module -> outline not set while drawing");
+            }
+#endif
+            outline.SetTransform(ref WorldPosition);
             outline.Draw(batch);
         }
 
         public override void Draw(SpriteBatch batch)
         {
-            sprite.setTransform(ref WorldPosition);
-            float lifePart = life / maxLife;
-            sprite.Color = IsDestroyed ? Color.Black : new(1 - lifePart, lifePart, 0);
+#if DEBUG
+            if (sprite == null)
+            {
+                throw new Exception("Module -> sprite not set while drawing");
+            }
+#endif
+            sprite.SetTransform(ref WorldPosition);
+            sprite.Color = IsDestroyed ? Color.Black : new(1 - (float)currentHealthFraction, (float)currentHealthFraction, 0);
             sprite.Draw(batch);
         }
 
@@ -88,16 +118,18 @@ namespace SaSimulator
                 throw new Exception("module destroyed twice");
             }
 #endif
+            float damageTaken;
             if (type == DamageType.Laser)
             {
-                life -= amount * game.DamageScaling * (1 - reflect);
+                damageTaken = amount * (1 - reflect);
             }
             else
             {
-                life -= amount * game.DamageScaling - armor;
+                damageTaken = amount - armor;
             }
+            currentHealthFraction -= damageTaken / maxHealth;
 
-            if (life <= 0)
+            if (currentHealthFraction <= 0)
             {
                 IsDestroyed = true;
                 foreach (var component in components)
@@ -108,33 +140,79 @@ namespace SaSimulator
             }
             return (amount - armor) * (1 - penetrationBlocking);
         }
+
+        static readonly StatType[] BaseModuleStats = [StatType.Health, StatType.Health, StatType.Health, StatType.Health, StatType.Health];
+        public void AppyBuff(ModuleBuff buff)
+        {
+            if(buff.targetModule == ModuleTag.Any)
+            {
+                ApplyBuffUnchecked(buff);
+                return;
+            }
+
+            foreach (IModuleComponent component in components)
+            {
+                if (component.Tags.Contains(buff.targetModule)) 
+                {
+                    if (BaseModuleStats.Contains(buff.stat)) // buff matches one of the component's tags but applies to basic stats
+                    {
+                        ApplyBuffUnchecked(buff);
+                        return;
+                    }
+                    component.ApplyBuff(buff); // buff matches one of the component's tags and applies to that component's stats
+                }
+            }
+        }
+
+        private void ApplyBuffUnchecked(ModuleBuff buff) // assumes the buff should affect this module and modifies one of the base module stats
+        {
+            switch (buff.stat)
+            {
+                case StatType.Health:
+                    maxHealth.Increase = buff.multiplier; break;
+                case StatType.Armor:
+                    armor.Increase = buff.multiplier; break;
+                case StatType.Reflect:
+                    reflect.Increase = buff.multiplier; break;
+                case StatType.PowerGen:
+                    powerGen.Increase = buff.multiplier; break;
+                case StatType.PowerUse:
+                    powerUse.Increase = buff.multiplier; break;
+            }
+        }
     }
 
     internal interface IModuleComponent
     {
-        void Tick(Time dt, Module module);
+        ModuleTag[] Tags {get;}
+        void Tick(Time dt, Module thisModule);
         void OnDestroyed(Module module);
+        void ApplyBuff(ModuleBuff buff); // assumes the buff should affect this module and modifies one of the base module stats
     }
 
-    internal class Gun(Distance range, float firingArc, float spread) : IModuleComponent
+    internal class Gun(Distance range, float firingArc, float spread, float damage, float fireRate) : IModuleComponent
     {
-        public Distance range = range;
-        float spread = spread;
-        float firingArc = firingArc;
+        protected Attribute<Distance> range = new(range);
+        protected float spread = spread;
+        Attribute<float> firingArc = new(firingArc);
+        protected Attribute<float> damage = new(damage);
+        protected Attribute<float> fireRate = new(fireRate);
         private Ship? target;
+
+        public virtual ModuleTag[] Tags => [ModuleTag.Weapon];
 
         public void OnDestroyed(Module module)
         {
         }
 
-        public virtual void Tick(Time dt, Module module)
+        public virtual void Tick(Time dt, Module thisModule)
         {
         }
 
         private bool CanTarget(Ship ship, Module thisModule)
         {
-            return !ship.IsDestroyed && Vector2.Distance(ship.WorldPosition.Position, thisModule.WorldPosition.Position) < range.Cells &&
-                   Physics.ConeCircleIntersect(ship.WorldPosition.Position, (float)ship.outerDiameter.Cells, thisModule.WorldPosition.Position, (float)thisModule.WorldPosition.rotation, firingArc);
+            return !ship.IsDestroyed && Vector2.Distance(ship.WorldPosition.Position, thisModule.WorldPosition.Position) < (float)(range.Value.Cells) &&
+                   Physics.ConeCircleIntersect(ship.WorldPosition.Position, ship.outerDiameter.Cells, thisModule.WorldPosition.Position, thisModule.WorldPosition.rotation, firingArc);
         }
 
         protected Ship? GetTarget(Module thisModule)
@@ -161,34 +239,49 @@ namespace SaSimulator
                 return 0;
             }
             Vector2 distance = target.WorldPosition.Position - thisModule.WorldPosition.Position;
-            return Physics.ClampAngle((float)Math.Atan2(distance.Y, distance.X), (float)thisModule.WorldPosition.rotation, firingArc / 2) + spread * (float)(thisModule.game.rng.NextDouble() - .5);
+            return ClampAngle((float)Math.Atan2(distance.Y, distance.X), (float)thisModule.WorldPosition.rotation, firingArc / 2) + spread * (float)(thisModule.game.rng.NextDouble() - .5);
+        }
+
+        public void ApplyBuff(ModuleBuff buff)
+        {
+            switch (buff.stat)
+            {
+                case StatType.Range:
+                    range.Increase = buff.multiplier; break;
+                case StatType.FiringArc:
+                    firingArc.Increase = buff.multiplier; break;
+                case StatType.Damage:
+                    damage.Increase = buff.multiplier; break;
+                case StatType.Firerate:
+                    fireRate.Increase = buff.multiplier; break;
+            }
         }
     }
 
-    // The gun will load one bullet every [cooldown], up to [maxAmmo]. When the bullets reach [burstFireThreshold]
+    // The gun will load one bullet every [1/firerate] seconds, up to [maxAmmo]. When the bullets reach [burstFireThreshold]
     // and an enemy is in range, the gun will enter burst fire, during which it will fire every [burstFireInterval]
     // until all bullets are depleted or no enemy is in range.
     // [firingArc] is the cone arc in which the gun can target and aim,
     // [spread] is a random deviation in the angle the bullet is fired (this can go past the firing arc)
-    internal class BallisticGun(Time cooldown, float maxAmmo, int burstFireThreshold,
+    internal class BurstGun(float firerate, float maxAmmo, int burstFireThreshold,
         Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread,
-        float damage) : Gun(range, firingArc, spread)
+        float damage) : Gun(range, firingArc, spread, damage, firerate)
     {
-        Time duration = range / bulletSpeed;
-        float bulletsPerSecond = 1 / (float)cooldown.Seconds;
-        Speed speed = bulletSpeed;
-        float damage = damage;
-        float maxAmmo = maxAmmo;
-        float ammo = 0;
-        bool isBurstFire = false;
-        Time burstFireActiveTime = 0.Seconds();
+        public Time duration = range / bulletSpeed;
+        protected Speed speed = bulletSpeed;
+        protected float maxAmmo = maxAmmo;
+        protected float ammo = 0;
+        protected bool isBurstFire = false;
+        protected Time burstFireActiveTime = 0.Seconds();
 
-        public override void Tick(Time dt, Module module)
+        public override ModuleTag[] Tags => [ModuleTag.Weapon, ModuleTag.Ballistic];
+
+        public override void Tick(Time dt, Module thisModule)
         {
-            ammo += (float)dt.Seconds * bulletsPerSecond;
+            ammo += dt.Seconds * fireRate;
             ammo = ammo > maxAmmo ? maxAmmo : ammo;
 
-            Ship? target = GetTarget(module);
+            Ship? target = GetTarget(thisModule);
 
             int bulletsToFire = 0;
             if (isBurstFire)
@@ -213,23 +306,44 @@ namespace SaSimulator
             while (bulletsToFire > 0 && target != null)
             {
                 bulletsToFire--;
-                module.game.AddObject(
-                    new Projectile(module.game, new(module.WorldPosition.x, module.WorldPosition.y, Aim(module)),
-                    speed, duration, damage, module.ship.side, new(1, 1, .2f, .5f)));
+                Fire(thisModule);
             }
+        }
+
+        public virtual void Fire(Module thisModule)
+        {
+            thisModule.game.AddObject(
+                    new Projectile(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
+                    speed, duration, damage, thisModule.ship.side, new(1, 1, .2f, .5f)));
         }
     }
 
-    internal class LaserGun(Time cooldown, Time duration,
-        Distance range, float firingArc,
-        float damage) : Gun(range, firingArc, 0)
+    internal class MissileGun(float firerate, float maxAmmo, int burstFireThreshold,
+        Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread,
+        float damage, float guidanceStrength) :
+        BurstGun(firerate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, damage)
     {
-        Time cooldown = cooldown, duration = duration;
-        float damage = damage;
+        public override ModuleTag[] Tags => [ModuleTag.Weapon, ModuleTag.Missile];
+
+        public override void Fire(Module thisModule)
+        {
+            thisModule.game.AddObject(
+                    new Missile(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
+                    speed, duration, damage, thisModule.ship.side, Color.LightGray, GetTarget(thisModule), guidanceStrength));
+        }
+    }
+
+    internal class LaserGun(float firerate, Time duration,
+        Distance range, float firingArc,
+        float damage) : Gun(range, firingArc, 0,damage, firerate)
+    {
+        Time duration = duration;
         bool currentlyFiring = false;
         Time currentPhaseRemainingDuration = 0.Seconds();
 
-        public override void Tick(Time dt, Module module)
+        public override ModuleTag[] Tags => [ModuleTag.Weapon, ModuleTag.Laser];
+
+        public override void Tick(Time dt, Module thisModule)
         {
             // on cooldown
             if (!currentlyFiring && currentPhaseRemainingDuration.Seconds > 0)
@@ -238,7 +352,7 @@ namespace SaSimulator
                 return;
             }
 
-            Ship? target = GetTarget(module);
+            Ship? target = GetTarget(thisModule);
             if (target == null)
             {
                 // not firing and not in range
@@ -246,7 +360,7 @@ namespace SaSimulator
                 if (currentlyFiring)
                 {
                     currentlyFiring = false;
-                    currentPhaseRemainingDuration = cooldown;
+                    currentPhaseRemainingDuration = (1/fireRate).Seconds();
                 }
                 return;
             }
@@ -259,12 +373,12 @@ namespace SaSimulator
 
             // firing and in range
             currentPhaseRemainingDuration -= dt;
-            Transform position = new(module.WorldPosition.x, module.WorldPosition.y, Aim(module));
-            module.game.AddObject(new Laser(module.game, position, range, damage * (float)dt.Seconds, module.ship.side, module.ship.side == 0 ? Color.LightBlue : Color.Red));
+            Transform position = new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule));
+            thisModule.game.AddObject(new Laser(thisModule.game, position, this.range, damage * (float)dt.Seconds, thisModule.ship.side, thisModule.ship.side == 0 ? Color.LightBlue : Color.Red));
 
             if (currentPhaseRemainingDuration.Seconds <= 0)
             {
-                currentPhaseRemainingDuration = cooldown;
+                currentPhaseRemainingDuration = (1 / fireRate).Seconds();
                 currentlyFiring = false;
             }
         }
@@ -274,22 +388,31 @@ namespace SaSimulator
     {
         public static Module SmallSteelArmor(Ship ship)
         {
-            return new(1, 1, "cell", 145, 3, 0, .55f, ship);
+            return new(1, 1, "cell", 145, 3, 0, .55f, 0, 0, 10, ship);
         }
         public static Module MediumSteelArmor(Ship ship)
         {
-            return new(2, 2, "cell", 550, 4, 0, .55f, ship);
+            return new(2, 2, "cell", 550, 4, 0, .55f, 0, 0, 10, ship);
         }
         public static Module Chaingun(Ship ship)
         {
-            Module gun = new(1, 1, "cell", 15, 0, 0, 0, ship);
-            gun.AddComponent(new BallisticGun((1 / 3d).Seconds(), 1, 1, 0.Seconds(), 35.Cells(), 200.CellsPerSecond(), 70f.ToRadians(), 0.05f, 4));
+            Module gun = new(1, 1, "cell", 15, 0, 0, 0, 0, 0, 10, ship);
+            gun.AddComponent(new BurstGun(3.3333f, 1, 1, 0.Seconds(), 35.Cells(), 200.CellsPerSecond(), 70f.ToRadians(), 0.05f, 4));
             return gun;
         }
         public static Module SmallLaser(Ship ship)
         {
-            Module gun = new(1, 1, "cell", 10005, 0, 0, 0, ship);
-            gun.AddComponent(new LaserGun(2.Seconds(), 2.Seconds(), 500.Cells(), 360f.ToRadians(), 10));
+            Module gun = new(1, 1, "cell", 15, 0, 0, 0, 0, 0, 10, ship);
+            gun.AddComponent(new LaserGun(0.5f, 2.Seconds(), 500.Cells(), 360f.ToRadians(), 10));
+            return gun;
+        }
+        public static Module SmallMissile(Ship ship)
+        {
+            Module gun = new(1, 2, "cell", 30, 0, 0, 0, 0, 0, 10, ship);
+            gun.AddComponent(new MissileGun(3.33333f, 1, 1, 0.Seconds(), 100.Cells(), 50.CellsPerSecond(), 70f.ToRadians(), 90f.ToRadians(), 4, 2f)
+            {
+                duration = 3.Seconds()
+            });
             return gun;
         }
     }

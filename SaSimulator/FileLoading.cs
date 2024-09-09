@@ -25,7 +25,7 @@ namespace SaSimulator
                     ShipInfo shipInfo = new(); // TODO: ship speed, turning
                     var lines = ships[s].Split('\n');
                     var shipArgs = lines[0].Split(' ');
-                    shipInfo.speed = double.Parse(shipArgs[0]).CellsPerSecond();
+                    shipInfo.speed = float.Parse(shipArgs[0]).CellsPerSecond();
                     shipInfo.turnSpeed = float.Parse(shipArgs[1]);
                     foreach (var line in lines)
                     {

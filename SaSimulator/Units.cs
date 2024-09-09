@@ -1,11 +1,12 @@
 ﻿// A bunch of this is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
 using System;
+using System.Numerics;
 
 namespace SaSimulator
 {
-    public readonly struct Distance(double cells)
+    public readonly struct Distance(float cells) : IMultiplyOperators<Distance, float, Distance>
     {
-        public readonly double Cells = cells;
+        public readonly float Cells = cells;
 
         public override readonly string ToString()
         {
@@ -16,7 +17,7 @@ namespace SaSimulator
         {
             return new(first.Cells + other.Cells);
         }
-        public static Distance operator *(Distance first, double other)
+        public static Distance operator *(Distance first, float other)
         {
             return new(first.Cells * other);
         }
@@ -24,7 +25,7 @@ namespace SaSimulator
         {
             return new(first.Cells - other.Cells);
         }
-        public static Distance operator /(Distance first, double other)
+        public static Distance operator /(Distance first, float other)
         {
             return new(first.Cells / other);
         }
@@ -38,9 +39,9 @@ namespace SaSimulator
         }
     }
 
-    public readonly struct Speed(double value)
+    public readonly struct Speed(float value)
     {
-        public readonly double CellsPerSecond = value;
+        public readonly float CellsPerSecond = value;
 
         public override readonly string ToString()
         {
@@ -51,7 +52,7 @@ namespace SaSimulator
         {
             return new(first.CellsPerSecond + other.CellsPerSecond);
         }
-        public static Speed operator *(Speed first, double other)
+        public static Speed operator *(Speed first, float other)
         {
             return new(first.CellsPerSecond * other);
         }
@@ -59,7 +60,7 @@ namespace SaSimulator
         {
             return new(first.CellsPerSecond - other.CellsPerSecond);
         }
-        public static Speed operator /(Speed first, double other)
+        public static Speed operator /(Speed first, float other)
         {
             return new(first.CellsPerSecond / other);
         }
@@ -69,9 +70,9 @@ namespace SaSimulator
         }
     }
 
-    public readonly struct Time(double seconds)
+    public readonly struct Time(float seconds)
     {
-        public readonly double Seconds = seconds;
+        public readonly float Seconds = seconds;
 
         public override string ToString()
         {
@@ -82,7 +83,7 @@ namespace SaSimulator
         {
             return new(first.Seconds + other.Seconds);
         }
-        public static Time operator *(Time first, double other)
+        public static Time operator *(Time first, float other)
         {
             return new(first.Seconds * other);
         }
@@ -90,7 +91,7 @@ namespace SaSimulator
         {
             return new(first.Seconds - other.Seconds);
         }
-        public static Time operator /(Time first, double other)
+        public static Time operator /(Time first, float other)
         {
             return new(first.Seconds / other);
         }
@@ -98,25 +99,25 @@ namespace SaSimulator
 
     public static class Extensions
     {
-        public static Distance Cells(this double value)
+        public static Distance Cells(this float value)
         {
-            return new((double)value);
+            return new((float)value);
         }
         public static Distance Cells(this int value)
         {
             return new(value);
         }
-        public static Speed CellsPerSecond(this double value)
+        public static Speed CellsPerSecond(this float value)
         {
-            return new((double)value);
+            return new((float)value);
         }
         public static Speed CellsPerSecond(this int value)
         {
             return new(value);
         }
-        public static Time Seconds(this double value)
+        public static Time Seconds(this float value)
         {
-            return new((double)value);
+            return new((float)value);
         }
         public static Time Seconds(this int value)
         {
@@ -126,17 +127,9 @@ namespace SaSimulator
         {
             return (float)(radians * 180 / Math.PI);
         }
-        public static double ToDegrees(this double radians)
-        {
-            return (radians * 180 / Math.PI);
-        }
         public static float ToRadians(this float degrees)
         {
             return (float)(degrees / 180 * Math.PI);
-        }
-        public static double ToRadians(this double degrees)
-        {
-            return (degrees / 180 * Math.PI);
         }
     }
 }

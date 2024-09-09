@@ -48,17 +48,17 @@ namespace SaSimulator
         public readonly struct Transform
         {
             public readonly Distance x, y;
-            public readonly double rotation;
+            public readonly float rotation;
             public readonly Vector2 Position { get { return new((float)x.Cells, (float)y.Cells); } }
 
-            public Transform(Distance x, Distance y, double rotation)
+            public Transform(Distance x, Distance y, float rotation)
             {
                 this.x = x;
                 this.y = y;
-                this.rotation = rotation % (2 * Math.PI);
+                this.rotation = rotation % (2 * (float)Math.PI);
                 if (this.rotation < 0)
                 {
-                    this.rotation += 2 * Math.PI;
+                    this.rotation += 2 * (float)Math.PI;
                 }
             }
 
@@ -72,14 +72,14 @@ namespace SaSimulator
             // assume [second] is relative to [first]. get its world position.
             public static Transform operator +(Transform first, Transform second)
             {
-                double cos = Math.Cos(first.rotation), sin = Math.Sin(first.rotation);
+                float cos = (float)Math.Cos(first.rotation), sin = (float)Math.Sin(first.rotation);
                 return new Transform(first.x + second.x * cos - second.y * sin, first.y + second.x * sin + second.y * cos, first.rotation + second.rotation);
             }
 
             // assume [first] and [second] are world positions. Find a transform "x" such that [first] + "x" = [second] (give or take floating point inaccuracy)
             public static Transform operator -(Transform first, Transform second)
             {
-                double cos = Math.Cos(first.rotation), sin = Math.Sin(first.rotation);
+                float cos = (float)Math.Cos(first.rotation), sin = (float)Math.Sin(first.rotation);
                 Distance dx = second.x - first.x, dy = second.y - first.y;
                 return new Transform((dx) * cos + (dy) * sin, (dx) * (-sin) + (dy) * cos, second.rotation - first.rotation);
             }
