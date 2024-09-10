@@ -1,5 +1,6 @@
 ﻿using CommandLine;
 using System;
+using System.Diagnostics;
 
 namespace SaSimulator
 {
@@ -55,6 +56,7 @@ namespace SaSimulator
 
             int win0 = 0, win1 = 0, draw = 0;
             Console.WriteLine("simulating...");
+            Stopwatch stopwatch = Stopwatch.StartNew();
             for (int i = 0; i < o.NumberSims; i++)
             {
                 Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? float.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
@@ -78,6 +80,8 @@ namespace SaSimulator
             }
             Console.WriteLine($"Player 0 has {win0} wins, {draw} draws, {win1} losses.");
             Console.WriteLine($"Winrate {win0 / (float)(win0 + win1) * 100:0.00}%");
+            stopwatch.Stop();
+            Console.WriteLine($"elapsed: {stopwatch.ElapsedMilliseconds} ms");
         }
 
         static void Main(string[] args)

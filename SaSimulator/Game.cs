@@ -61,10 +61,10 @@ namespace SaSimulator
             {
                 return new(1, 1, 1, 1);
             }
-            float minX = allShips.Select(go => (float)(go.WorldPosition.x - go.outerDiameter / 2).Cells).Min();
-            float maxX = allShips.Select(go => (float)(go.WorldPosition.x + go.outerDiameter / 2).Cells).Max();
-            float minY = allShips.Select(go => (float)(go.WorldPosition.y - go.outerDiameter / 2).Cells).Min();
-            float maxY = allShips.Select(go => (float)(go.WorldPosition.y + go.outerDiameter / 2).Cells).Max();
+            float minX = allShips.Select(go => (go.WorldPosition.x - go.outerDiameter / 2).Cells).Min();
+            float maxX = allShips.Select(go => (go.WorldPosition.x + go.outerDiameter / 2).Cells).Max();
+            float minY = allShips.Select(go => (go.WorldPosition.y - go.outerDiameter / 2).Cells).Min();
+            float maxY = allShips.Select(go => (go.WorldPosition.y + go.outerDiameter / 2).Cells).Max();
             return new(minX, minY, maxX - minX, maxY - minY);
         }
 
