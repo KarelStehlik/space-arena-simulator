@@ -35,7 +35,8 @@ namespace SaSimulator
         public Time time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
-        public float DamageScaling { get; private set; } = 1; // According to Discord, all damage increases by 3% per second starting at 25 seconds.
+        public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
+                                                              // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
 
         public void Load()
         {
@@ -61,10 +62,10 @@ namespace SaSimulator
             {
                 return new(1, 1, 1, 1);
             }
-            float minX = allShips.Select(go => (go.WorldPosition.x - go.outerDiameter / 2).Cells).Min();
-            float maxX = allShips.Select(go => (go.WorldPosition.x + go.outerDiameter / 2).Cells).Max();
-            float minY = allShips.Select(go => (go.WorldPosition.y - go.outerDiameter / 2).Cells).Min();
-            float maxY = allShips.Select(go => (go.WorldPosition.y + go.outerDiameter / 2).Cells).Max();
+            float minX = allShips.Select(go => (go.WorldPosition.x - go.size / 2).Cells).Min();
+            float maxX = allShips.Select(go => (go.WorldPosition.x + go.size / 2).Cells).Max();
+            float minY = allShips.Select(go => (go.WorldPosition.y - go.size / 2).Cells).Min();
+            float maxY = allShips.Select(go => (go.WorldPosition.y + go.size / 2).Cells).Max();
             return new(minX, minY, maxX - minX, maxY - minY);
         }
 

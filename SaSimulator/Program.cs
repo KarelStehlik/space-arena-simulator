@@ -54,34 +54,37 @@ namespace SaSimulator
                 return;
             }
 
-            int win0 = 0, win1 = 0, draw = 0;
-            Console.WriteLine("simulating...");
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            for (int i = 0; i < o.NumberSims; i++)
+            for (int t = 0; t < 100; t++)
             {
-                Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? float.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
-                game.Load();
-                while (game.result == Game.GameResult.unfinished)
+                int win0 = 0, win1 = 0, draw = 0;
+                Console.WriteLine("simulating...");
+                Stopwatch stopwatch = Stopwatch.StartNew();
+                for (int i = 0; i < o.NumberSims; i++)
                 {
-                    game.Tick();
+                    Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? float.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
+                    game.Load();
+                    while (game.result == Game.GameResult.unfinished)
+                    {
+                        game.Tick();
+                    }
+                    switch (game.result)
+                    {
+                        case Game.GameResult.win_0:
+                            win0++;
+                            break;
+                        case Game.GameResult.win_1:
+                            win1++;
+                            break;
+                        case Game.GameResult.draw:
+                            draw++;
+                            break;
+                    }
                 }
-                switch (game.result)
-                {
-                    case Game.GameResult.win_0:
-                        win0++;
-                        break;
-                    case Game.GameResult.win_1:
-                        win1++;
-                        break;
-                    case Game.GameResult.draw:
-                        draw++;
-                        break;
-                }
+                Console.WriteLine($"Player 0 has {win0} wins, {draw} draws, {win1} losses.");
+                Console.WriteLine($"Winrate {win0 / (float)(win0 + win1) * 100:0.00}%");
+                stopwatch.Stop();
+                Console.WriteLine($"elapsed: {stopwatch.ElapsedMilliseconds} ms");
             }
-            Console.WriteLine($"Player 0 has {win0} wins, {draw} draws, {win1} losses.");
-            Console.WriteLine($"Winrate {win0 / (float)(win0 + win1) * 100:0.00}%");
-            stopwatch.Stop();
-            Console.WriteLine($"elapsed: {stopwatch.ElapsedMilliseconds} ms");
         }
 
         static void Main(string[] args)

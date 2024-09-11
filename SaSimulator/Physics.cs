@@ -49,7 +49,7 @@ namespace SaSimulator
         {
             public readonly Distance x, y;
             public readonly float rotation;
-            public readonly Vector2 Position { get { return new((float)x.Cells, (float)y.Cells); } }
+            public readonly Vector2 Position { get { return new(x.Cells, y.Cells); } }
 
             public Transform(Distance x, Distance y, float rotation)
             {
@@ -66,7 +66,7 @@ namespace SaSimulator
             public static Vector2 operator +(Transform transform, Vector2 vector)
             {
                 float cos = (float)Math.Cos(transform.rotation), sin = (float)Math.Sin(transform.rotation);
-                return new((float)transform.x.Cells + vector.X * cos - vector.Y * sin, (float)transform.y.Cells + vector.X * sin + vector.Y * cos);
+                return new(transform.x.Cells + vector.X * cos - vector.Y * sin, transform.y.Cells + vector.X * sin + vector.Y * cos);
             }
 
             // assume [second] is relative to [first]. get its world position.
@@ -81,7 +81,7 @@ namespace SaSimulator
             {
                 float cos = (float)Math.Cos(first.rotation), sin = (float)Math.Sin(first.rotation);
                 Distance dx = second.x - first.x, dy = second.y - first.y;
-                return new Transform((dx) * cos + (dy) * sin, (dx) * (-sin) + (dy) * cos, second.rotation - first.rotation);
+                return new Transform(dx * cos + dy * sin, dx * (-sin) + dy * cos, second.rotation - first.rotation);
             }
         }
     }

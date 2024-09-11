@@ -9,7 +9,8 @@ using static SaSimulator.Physics;
 namespace SaSimulator
 {
     enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine }
-    enum StatType { Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range, FiringArc, Thrust, TurnThrust }
+    enum StatType { Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range,
+        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
     {
@@ -94,6 +95,10 @@ namespace SaSimulator
             sprite.SetTransform(ref WorldPosition);
             sprite.Color = IsDestroyed ? Color.Black : new(1 - (float)currentHealthFraction, (float)currentHealthFraction, 0);
             sprite.Draw(batch);
+            foreach(var component in components)
+            {
+                component.Draw(batch, this);
+            }
         }
 
         public override void Tick(Time dt)
@@ -188,6 +193,87 @@ namespace SaSimulator
         void Tick(Time dt, Module thisModule);
         void OnDestroyed(Module module);
         void ApplyBuff(ModuleBuff buff); // assumes the buff should affect this module and modifies one of the base module stats
+        void Draw(SpriteBatch batch, Module thisModule);
+    }
+
+    // [speculative game mechanic]. In this implementation, shields will protect all cells whose centre they cover
+    // from all damage, regardless of whether the damage actually passes through the shield before reaching the edge of the cell.
+    // see this video: https://youtube.com/shorts/8J-nw48iT7A?feature=share
+    // the front surface of my 2 chainguns was not covered by any shields, yet they were protected. They were both destroyed around the same time,
+    // probably because the shields broke.
+    internal class Shield(float strength, Distance radius, float regenRate, float maxRegen) : IModuleComponent
+    {
+        private Attribute<float> strength=new(strength);
+        private Attribute<Distance> radius = new(radius);
+        public Distance Radius { get { return radius; } }
+        private Attribute<float> regenRate=new(regenRate);
+        private Attribute<float> maxRegen=new(maxRegen);
+        private float regenRemainingFraction = 1, strengthRemainingFraction = 1;
+        private bool mustReapply = false;
+        private Sprite? sprite;
+        private Time timeSinceDamageTaken = 10.Seconds();
+
+        public ModuleTag[] Tags => [ModuleTag.Shield];
+
+        public void ApplyBuff(ModuleBuff buff)
+        {
+            switch (buff.stat)
+            {
+                case StatType.ShieldStrength:
+                    strength.Increase = buff.multiplier; break;
+                case StatType.ShieldRadius:
+                    radius.Increase = buff.multiplier;
+                    mustReapply = true; break;
+                case StatType.ShieldRegenRate:
+                    regenRate.Increase = buff.multiplier; break;
+                case StatType.ShieldMaxRegen:
+                    maxRegen.Increase = buff.multiplier; break;
+            }
+        }
+
+        public bool IsActive()
+        {
+            return strengthRemainingFraction > 0;
+        }
+
+        public void TakeShieldDamage(float amount, DamageType type)
+        {
+            strengthRemainingFraction -= amount / strength;
+            timeSinceDamageTaken = 0.Seconds();
+        }
+
+        public void OnDestroyed(Module module)
+        {
+        }
+
+        public void Tick(Time dt, Module thisModule)
+        {
+            if (mustReapply) // this shouldn't really happen, as no module bonuses affect shield radius. it is here for completeness.
+            {
+                thisModule.ship.RemoveShield(this);
+                thisModule.ship.AddShield(this, thisModule, radius);
+            }
+            if(strengthRemainingFraction < 1)
+            {
+                float regenAmount = Math.Min(regenRate, regenRemainingFraction * maxRegen);
+                regenRemainingFraction -= regenAmount / maxRegen;
+                strengthRemainingFraction += regenAmount / strength;
+            }
+            timeSinceDamageTaken += dt;
+        }
+
+        public void Draw(SpriteBatch batch, Module thisModule)
+        {
+            if (sprite == null)
+            {
+                sprite = new("shield");
+                sprite.Size = new Vector2(Radius.Cells * 2, Radius.Cells * 2);
+            }
+            sprite.Position = thisModule.WorldPosition.Position;
+            float opacity = Math.Max(0, 1f - timeSinceDamageTaken.Seconds);
+            sprite.Color = new(opacity, opacity, opacity, opacity);
+            sprite.Draw(batch);
+        }
     }
 
     internal class Gun(Distance range, float firingArc, float spread, float damage, float fireRate) : IModuleComponent
@@ -212,7 +298,7 @@ namespace SaSimulator
         private bool CanTarget(Ship ship, Module thisModule)
         {
             return !ship.IsDestroyed && Vector2.Distance(ship.WorldPosition.Position, thisModule.WorldPosition.Position) < (float)(range.Value.Cells) &&
-                   Physics.ConeCircleIntersect(ship.WorldPosition.Position, ship.outerDiameter.Cells, thisModule.WorldPosition.Position, thisModule.WorldPosition.rotation, firingArc);
+                   ConeCircleIntersect(ship.WorldPosition.Position, ship.size.Cells, thisModule.WorldPosition.Position, thisModule.WorldPosition.rotation, firingArc);
         }
 
         protected Ship? GetTarget(Module thisModule)
@@ -255,6 +341,10 @@ namespace SaSimulator
                 case StatType.Firerate:
                     fireRate.Increase = buff.multiplier; break;
             }
+        }
+
+        public void Draw(SpriteBatch batch, Module thisModule)
+        {
         }
     }
 
@@ -414,6 +504,12 @@ namespace SaSimulator
                 duration = 3.Seconds()
             });
             return gun;
+        }
+        public static Module SmallShield(Ship ship)
+        {
+            Module shield = new(1, 2, "cell", 30, 0, 0, 0, 0, 0, 10, ship);
+            shield.AddComponent(new Shield(20000, 7.Cells(), 10, 200));
+            return shield;
         }
     }
 }

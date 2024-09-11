@@ -10,9 +10,9 @@ namespace SaSimulator
     internal class ModulePlacement(string module, int x, int y)
     {
         public readonly string module = module;
-        // this is janky, but not a typo.
+        // this is questionable, but not a typo.
         // The space arena ship builder has the ship pointing upwards, so a player might expect the ship's front to be in the positive Y direction.
-        // However, it made more sense for me to have the ship facing forward so from its reference frame "forward" would be positive X, that is angle 0.
+        // However, it made more sense for me to have the ship facing forward so from its reference frame "forward" would be angle 0, that is positive X
         // This conversion happens here.
         public readonly int x = y, y = x;
     }
@@ -26,15 +26,21 @@ namespace SaSimulator
 
     internal class Ship : GameObject
     {
+        public class Cell(Module? module)
+        {
+            public readonly Module? module = module;
+            public readonly List<Shield> coveringShields = [];
+        }
+
         private readonly float MOVEMENT_DAMPENING = 0.8f;
         private readonly float ROTATION_DAMPENING = 0.1f;
 
-        private readonly Module[,] cells; // for each cell in this ship's grid, stores which module lies in this cell. Each module is stored here once for every cell it covers
+        private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
+                                        // Each module is stored here once for every cell it covers
         private readonly List<Module> modules = []; // stores each module once
         private readonly int initialModuleNumber;
         public int modulesAlive;
         private readonly int width = 0, height = 0; // in cells
-        public readonly Distance outerDiameter, innerDiameter;
         public readonly int side;
         private Speed acceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
         private float turnPower, turningVelocity = 0;
@@ -48,7 +54,8 @@ namespace SaSimulator
             acceleration = info.speed;
             turnPower = info.turnSpeed;
 
-            // First, we create the modules
+            int maxShieldRadius = 0;
+
             foreach (ModulePlacement placement in info.modules)
             {
                 // create the requested module
@@ -57,24 +64,34 @@ namespace SaSimulator
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
                 modules.Add(module);
+
                 // determine ship width and height
-                width = width > placement.x + module.width ? width : placement.x + module.width;
-                height = height > placement.y + module.height ? height : placement.y + module.height;
+                width = Math.Max(width, placement.x + module.width);
+                height = Math.Max(height, placement.y + module.height);
+
+                foreach(IModuleComponent component in module.components)
+                {
+                    if(component is Shield shield)
+                    {
+                        maxShieldRadius = Math.Max(maxShieldRadius, (int)shield.Radius.Cells);
+                    }
+                }
             }
 
-            // create ship grid
-            cells = new Module[width, height];
+            width += 2 * maxShieldRadius;
+            height += 2 * maxShieldRadius;
 
-            innerDiameter = Math.Min(width, height).Cells();
-            outerDiameter = Math.Max(width, height).Cells();
-            size = outerDiameter / 2;
+            // create ship grid
+            cells = new Cell[width, height];
+
+            size = Math.Max(width, height).Cells() / (float)Math.Sqrt(2);
             initialModuleNumber = modulesAlive = modules.Count;
 
             // fill ship grid
             foreach (Module module in modules)
             {
-                int xGridPos = (int)module.relativePosition.x.Cells;
-                int yGridPos = (int)module.relativePosition.y.Cells;
+                int xGridPos = (int)module.relativePosition.x.Cells + maxShieldRadius;
+                int yGridPos = (int)module.relativePosition.y.Cells + maxShieldRadius;
                 for (int x = xGridPos; x < xGridPos + module.width; x++)
                 {
                     for (int y = yGridPos; y < yGridPos + module.height; y++)
@@ -83,11 +100,23 @@ namespace SaSimulator
                         {
                             throw new ArgumentException($"Invalid ship: Cell [{x}, {y}] is covered by multiple modules.");
                         }
-                        cells[x, y] = module;
+                        cells[x, y] = new(module);
                     }
                 }
                 // set module position relative to ship centre
-                module.relativePosition += new Transform((-width + module.width).Cells() / 2, (-height + module.height).Cells() / 2, 0);
+                module.relativePosition += new Transform((-width + module.width + 2*maxShieldRadius).Cells() / 2, (-height + module.height + 2*maxShieldRadius).Cells() / 2, 0);
+            }
+
+            // activate shields
+            foreach(Module module in modules)
+            {
+                foreach(IModuleComponent component in module.components)
+                {
+                    if(component is Shield shield)
+                    {
+                        AddShield(shield, module, shield.Radius);
+                    }
+                }
             }
         }
 
@@ -129,13 +158,13 @@ namespace SaSimulator
             {
                 // determine whether the enemy is to the left of this ship
                 float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
-                if (Physics.IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
+                if (IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
                 {
-                    turningVelocity += turnPower * (float)dt.Seconds;
+                    turningVelocity += turnPower * dt.Seconds;
                 }
                 else
                 {
-                    turningVelocity -= turnPower * (float)dt.Seconds;
+                    turningVelocity -= turnPower * dt.Seconds;
                 }
 
                 vx += acceleration * (float)Math.Cos(WorldPosition.rotation) * dt.Seconds;
@@ -178,33 +207,91 @@ namespace SaSimulator
             }
         }
 
-        public readonly struct ModuleHit(Module module, Vector2 position)
+        // removes a shield completely from covering any cells. This is very slow, and should basically never be called.
+        // Instead, we will simply ignore depleted shields when processing hits.
+        public void RemoveShield(Shield shield)
         {
-            public readonly Module module = module;
-            public readonly Vector2 position = position;
+            for(int x=0; x<cells.GetLength(0); x++)
+            {
+                for(int y=0; y<cells.GetLength(1); y++)
+                {
+                    Cell? cell = cells[x, y];
+                    if (cell!=null && cell.coveringShields.Contains(shield))
+                    {
+                        cell.coveringShields.Remove(shield);
+                    }
+                }
+            }
+        }
+
+
+        // adds a shield to all cells whose centre it covers. Doesn't generate new cells beyond the current 2d array,
+        // (as we would need to reallocate everything and change a bunch of the ship's properties),
+        // so a shield added this way which reaches past the ship will not have collisions beyond the ship's current borders.
+        // There is no way in space arena to add shields or increase their size after ship creation, so this shouldn't be an issue.
+        public void AddShield(Shield shield, Module source, Distance radius)
+        {
+            float middleCellX = source.relativePosition.x.Cells + width / 2;
+            float middleCellY = source.relativePosition.y.Cells + height / 2;
+            int minX = (int)(middleCellX - radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=2 cell whose centre is at 2.5.
+            int minY = (int)(middleCellY - radius.Cells - 0.4f);
+            int maxX = (int)(middleCellX + radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=6 cell whose centre is at 6.5.
+            int maxY = (int)(middleCellY + radius.Cells - 0.4f);
+            minX = Math.Max(0, minX);
+            minY = Math.Max(0, minY);
+            maxX = Math.Min(maxX, cells.GetLength(0)-1);
+            maxY = Math.Min(maxY, cells.GetLength(1)-1);
+
+            for(int x=minX; x<=maxX; x++)
+            {
+                for(int y=minY; y<=maxY; y++)
+                {
+                    if(Vector2.Distance(new(middleCellX,middleCellY), new(x+.5f,y+.5f)) < radius.Cells)
+                    {
+                        if(cells[x, y] == null)
+                        {
+                            cells[x, y] = new(null);
+                        }
+                        cells[x, y].coveringShields.Add(shield);
+                    }
+                }
+            }
+        }
+
+        public readonly struct HitDetected(Cell cell, Distance traveled)
+        {
+            public readonly Cell cell = cell;
+            public readonly Distance traveled = traveled;
         }
 
         // Enumerates modules in all cells hit by the given ray.
-        public IEnumerable<ModuleHit> RayIntersect(Transform rayOrigin, Distance rayLength)
+        public IEnumerable<HitDetected> RayIntersect(Transform rayOrigin, Distance rayLength)
         {
-            // first, get the ray into the reference frame of this ship.
+            // if the ray is too far, do nothing
+            float maxDistance = (size + rayLength).Cells;
+            if (Vector2.DistanceSquared(rayOrigin.Position,WorldPosition.Position) > maxDistance * maxDistance)
+            {
+                yield break;
+            }
+
+            // get the ray into the reference frame of this ship.
             Transform ray = WorldPosition - rayOrigin;
 
             // the lowest-coordinate corner of this ship
             Vector2 lowestCorner = new(-width / 2f, -height / 2f);
 
-            float stepSize = 0.5f;
+            float stepSize = 0.8f;
             Vector2 step = new Vector2((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation))*stepSize;
             Vector2 pos = ray.Position - lowestCorner;
 
-            // commence brute force temporary solution
+            // commence simple search
             for (int i = 0; i*stepSize <= rayLength.Cells; i++)
             {
                 if (pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
                 {
                     if (cells[(int)pos.X, (int)pos.Y] != null)
                     {
-                        yield return new(cells[(int)pos.X, (int)pos.Y], WorldPosition + (pos + lowestCorner));
+                        yield return new(cells[(int)pos.X, (int)pos.Y], stepSize.Cells()*i);
                     }
                 }
                 pos += step;

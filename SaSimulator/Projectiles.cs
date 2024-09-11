@@ -1,8 +1,9 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
+﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using static SaSimulator.Physics;
 using static SaSimulator.Ship;
+using Microsoft.Xna.Framework;
+using System.Linq;
 
 namespace SaSimulator
 {
@@ -66,11 +67,17 @@ namespace SaSimulator
             var targets = side == 0 ? game.player1.ships : game.player0.ships;
             foreach (var target in targets)
             {
-                foreach (ModuleHit module in target.RayIntersect(WorldPosition, speed * dt))
+                foreach (HitDetected hit in target.RayIntersect(WorldPosition, speed * dt))
                 {
-                    OnHit(target, module);
+                    OnHit(target, hit);
                     if (IsDestroyed)
                     {
+                        if (game.hasGraphics)
+                        {
+                            Time travelTime = hit.traveled / speed;
+                            WorldPosition = new(WorldPosition.x + vx * travelTime, WorldPosition.y + vy * travelTime, WorldPosition.rotation);
+                            DrawTrail();
+                        }
                         return;
                     }
                 }
@@ -87,23 +94,30 @@ namespace SaSimulator
             WorldPosition = new(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation);
         }
 
-        protected virtual void OnHit(Ship target, ModuleHit module)
+        protected virtual void OnHit(Ship target, HitDetected hit)
         {
+            foreach (Shield shield in hit.cell.coveringShields)
+            {
+                if (shield.IsActive())
+                {
+                    shield.TakeShieldDamage(damage, DamageType.Ballistics);
+                    IsDestroyed = true;
+                    return;
+                }
+            }
+            if (hit.cell.module == null)
+            {
+                return;
+            }
+            if (hit.cell.module.IsDestroyed)
+            {
+                Time travelTime = hit.traveled / speed;
+                target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).TakeDamage(damage, DamageType.Ballistics);
+                IsDestroyed = true;
+                return;
+            }
+            hit.cell.module.TakeDamage(damage, DamageType.Ballistics);
             IsDestroyed = true;
-            if (game.hasGraphics)
-            {
-                WorldPosition = new(((float)module.position.X).Cells(), ((float)module.position.Y).Cells(), WorldPosition.rotation);
-                DrawTrail();
-            }
-            if (module.module.IsDestroyed)
-            {
-                target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Ballistics);
-            }
-            else
-            {
-                module.module.TakeDamage(damage, DamageType.Ballistics);
-            }
-            return;
         }
 
         protected virtual void DrawTrail()
@@ -134,23 +148,21 @@ namespace SaSimulator
             lastPosition = WorldPosition.Position;
         }
 
-        protected override void OnHit(Ship target, ModuleHit module)
+        protected override void OnHit(Ship target, HitDetected hit)
         {
+            if (hit.cell.module == null)
+            {
+                return;
+            }
+            if (hit.cell.module.IsDestroyed)
+            {
+                Time travelTime = hit.traveled / speed;
+                target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).TakeDamage(damage, DamageType.Laser);
+                IsDestroyed = true;
+                return;
+            }
+            hit.cell.module.TakeDamage(damage, DamageType.Laser);
             IsDestroyed = true;
-            if (game.hasGraphics)
-            {
-                WorldPosition = new(((float)module.position.X).Cells(), ((float)module.position.Y).Cells(), WorldPosition.rotation);
-                DrawTrail();
-            }
-            if (module.module.IsDestroyed)
-            {
-                target.GetNearestModule(module.position).TakeDamage(damage, DamageType.Laser);
-            }
-            else
-            {
-                module.module.TakeDamage(damage, DamageType.Laser);
-            }
-            return;
         }
     }
 
@@ -180,21 +192,30 @@ namespace SaSimulator
             base.Tick(dt);
         }
 
-        protected override void OnHit(Ship target, ModuleHit module)
+        protected override void OnHit(Ship target, HitDetected hit)
         {
-            IsDestroyed = true;
-            if (game.hasGraphics)
+            foreach (Shield shield in hit.cell.coveringShields)
             {
-                WorldPosition = new(((float)module.position.X).Cells(), ((float)module.position.Y).Cells(), WorldPosition.rotation);
-                DrawTrail();
+                if (shield.IsActive())
+                {
+                    shield.TakeShieldDamage(damage, DamageType.Explosive); // missiles do not deal aoe damage when hitting shields
+                    IsDestroyed = true;
+                    return;
+                }
             }
-            Vector2 explosionOrigin = module.position;
-            if (module.module.IsDestroyed)
+            if (hit.cell.module == null)
             {
-                explosionOrigin = target.GetNearestModule(module.position).WorldPosition.Position;
+                return;
+            }
+
+            System.Numerics.Vector2 explosionOrigin = WorldPosition.Position;
+            if (hit.cell.module.IsDestroyed)
+            {
+                Time travelTime = hit.traveled / speed;
+                explosionOrigin=target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).WorldPosition.Position;
             }
             //target.TakeAoeDamage(explosionOrigin, this.damage, DamageType.Explosive);
-            return;
+            IsDestroyed = true;
         }
     }
 }
