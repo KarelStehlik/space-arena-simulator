@@ -23,7 +23,7 @@ namespace SaSimulator
             }
         }
 
-        public void SetTransform(ref Transform t)
+        public void SetTransform(Transform t)
         {
             Position = new(t.x.Cells, t.y.Cells);
             Rotation = t.rotation;

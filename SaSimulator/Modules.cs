@@ -1,17 +1,20 @@
-﻿using Microsoft.Xna.Framework;
+﻿// Ignore Spelling: Chaingun
+
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
-    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine }
+    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine, Junk }
     enum StatType
     {
         Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range,
-        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius, ExplosionRadius
+        FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, Radius, ExplosionRadius, JunkHealth
     }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
@@ -27,7 +30,7 @@ namespace SaSimulator
     internal class Module : GameObject
     {
         public readonly int width, height; // Width and height in cells
-        public Transform relativePosition; // relative to ship centre
+        public Transform relativePosition; // relative to ship center
         private readonly Sprite? sprite;
         private readonly Sprite? outline;
         private float currentHealthFraction = 1;
@@ -82,7 +85,7 @@ namespace SaSimulator
                 throw new Exception("Module -> outline not set while drawing");
             }
 #endif
-            outline.SetTransform(ref WorldPosition);
+            outline.SetTransform(WorldPosition);
             outline.Draw(batch);
         }
 
@@ -94,7 +97,7 @@ namespace SaSimulator
                 throw new Exception("Module -> sprite not set while drawing");
             }
 #endif
-            sprite.SetTransform(ref WorldPosition);
+            sprite.SetTransform(WorldPosition);
             sprite.Color = IsDestroyed ? Color.Black : new(1 - (float)currentHealthFraction, (float)currentHealthFraction, 0);
             sprite.Draw(batch);
             foreach (var component in components)
@@ -149,7 +152,7 @@ namespace SaSimulator
         }
 
         static readonly StatType[] BaseModuleStats = [StatType.Health, StatType.Health, StatType.Health, StatType.Health, StatType.Health];
-        public void AppyBuff(ModuleBuff buff)
+        public void ApplyBuff(ModuleBuff buff)
         {
             if (buff.targetModule == ModuleTag.Any)
             {
@@ -176,15 +179,15 @@ namespace SaSimulator
             switch (buff.stat)
             {
                 case StatType.Health:
-                    maxHealth.Increase = buff.multiplier; break;
+                    maxHealth.Increase += buff.multiplier; break;
                 case StatType.Armor:
-                    armor.Increase = buff.multiplier; break;
+                    armor.Increase += buff.multiplier; break;
                 case StatType.Reflect:
-                    reflect.Increase = buff.multiplier; break;
+                    reflect.Increase += buff.multiplier; break;
                 case StatType.PowerGen:
-                    powerGen.Increase = buff.multiplier; break;
+                    powerGen.Increase += buff.multiplier; break;
                 case StatType.PowerUse:
-                    powerUse.Increase = buff.multiplier; break;
+                    powerUse.Increase += buff.multiplier; break;
             }
         }
     }
@@ -198,7 +201,7 @@ namespace SaSimulator
         void Draw(SpriteBatch batch, Module thisModule);
     }
 
-    // [speculative game mechanic]. In this implementation, shields will protect all cells whose centre they cover
+    // [speculative game mechanic]. In this implementation, shields will protect all cells whose center they cover
     // from all damage, regardless of whether the damage actually passes through the shield before reaching the edge of the cell.
     // see this video: https://youtube.com/shorts/8J-nw48iT7A?feature=share
     // the front surface of my 2 chainguns was not covered by any shields, yet they were protected. They were both destroyed around the same time,
@@ -221,15 +224,15 @@ namespace SaSimulator
         {
             switch (buff.stat)
             {
-                case StatType.ShieldStrength:
-                    strength.Increase = buff.multiplier; break;
-                case StatType.ShieldRadius:
-                    radius.Increase = buff.multiplier;
+                case StatType.Strength:
+                    strength.Increase += buff.multiplier; break;
+                case StatType.Radius:
+                    radius.Increase += buff.multiplier;
                     mustReapply = true; break;
-                case StatType.ShieldRegenRate:
-                    regenRate.Increase = buff.multiplier; break;
-                case StatType.ShieldMaxRegen:
-                    maxRegen.Increase = buff.multiplier; break;
+                case StatType.RegenRate:
+                    regenRate.Increase += buff.multiplier; break;
+                case StatType.MaxRegen:
+                    maxRegen.Increase += buff.multiplier; break;
             }
         }
 
@@ -266,11 +269,10 @@ namespace SaSimulator
 
         public void Draw(SpriteBatch batch, Module thisModule)
         {
-            if (sprite == null)
-            {
-                sprite = new("shield");
-                sprite.Size = new Vector2(Radius.Cells * 2, Radius.Cells * 2);
-            }
+            sprite ??= new("shield")
+                {
+                    Size = new Vector2(Radius.Cells * 2, Radius.Cells * 2)
+                };
             sprite.Position = thisModule.WorldPosition.Position;
             float opacity = Math.Max(0, 1f - timeSinceDamageTaken.Seconds);
             sprite.Color = new(opacity, opacity, opacity, opacity);
@@ -281,6 +283,7 @@ namespace SaSimulator
     internal class Gun(Distance range, float firingArc, float spread, float damage, float fireRate) : IModuleComponent
     {
         protected Attribute<Distance> range = new(range);
+        public Distance Range { get { return range; } }
         protected float spread = spread;
         Attribute<float> firingArc = new(firingArc);
         protected Attribute<float> damage = new(damage);
@@ -335,13 +338,13 @@ namespace SaSimulator
             switch (buff.stat)
             {
                 case StatType.Range:
-                    range.Increase = buff.multiplier; break;
+                    range.Increase += buff.multiplier; break;
                 case StatType.FiringArc:
-                    firingArc.Increase = buff.multiplier; break;
+                    firingArc.Increase += buff.multiplier; break;
                 case StatType.Damage:
-                    damage.Increase = buff.multiplier; break;
+                    damage.Increase += buff.multiplier; break;
                 case StatType.Firerate:
-                    fireRate.Increase = buff.multiplier; break;
+                    fireRate.Increase += buff.multiplier; break;
             }
         }
 
@@ -350,7 +353,7 @@ namespace SaSimulator
         }
     }
 
-    // The gun will load one bullet every [1/firerate] seconds, up to [maxAmmo]. When the bullets reach [burstFireThreshold]
+    // The gun will load one bullet every [1/fire rate] seconds, up to [maxAmmo]. When the bullets reach [burstFireThreshold]
     // and an enemy is in range, the gun will enter burst fire, during which it will fire every [burstFireInterval]
     // until all bullets are depleted or no enemy is in range.
     // [firingArc] is the cone arc in which the gun can target and aim,
@@ -425,12 +428,12 @@ namespace SaSimulator
                     speed, duration, radius, damage, thisModule.ship.side, Color.LightGray, GetTarget(thisModule), guidanceStrength));
         }
 
-        public void ApplyBuff(ModuleBuff buff)
+        public override void ApplyBuff(ModuleBuff buff)
         {
             base.ApplyBuff(buff);
             if (buff.stat == StatType.ExplosionRadius)
             {
-                radius.Increase = buff.multiplier;
+                radius.Increase += buff.multiplier;
             }
         }
     }
@@ -486,6 +489,29 @@ namespace SaSimulator
         }
     }
 
+    internal class JunkLauncher(float firerate, float maxAmmo, int burstFireThreshold,
+        Time burstFireInterval, Distance range, Speed bulletSpeed, float health) :
+        BurstGun(firerate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, 2 * (float)Math.PI, 2*(float)Math.PI, 0)
+    {
+        Attribute<float> junkHealth = new(health);
+
+        public override ModuleTag[] Tags => [ModuleTag.Junk];
+
+        public override void Fire(Module thisModule)
+        {
+            thisModule.game.AddObject(new JunkPiece(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)), speed, duration, health,thisModule.ship.side));
+        }
+
+        public override void ApplyBuff(ModuleBuff buff)
+        {
+            base.ApplyBuff(buff);
+            if (buff.stat == StatType.JunkHealth)
+            {
+                junkHealth.Increase += buff.multiplier;
+            }
+        }
+    }
+
     internal static class Modules
     {
         public static Module SmallSteelArmor(Ship ship)
@@ -522,6 +548,12 @@ namespace SaSimulator
             Module shield = new(1, 2, "cell", 30, 0, 0, 0, 0, 0, 10, ship);
             shield.AddComponent(new Shield(20, 7.Cells(), 10, 200));
             return shield;
+        }
+        public static Module Junk(Ship ship)
+        {
+            Module junk = new(2,2,"cell",150,2,0,20,20,0,50,ship);
+            junk.AddComponent(new JunkLauncher(3, 4, 3, 0.Seconds(), 100.Cells(), 10.CellsPerSecond(), 10));
+            return junk;
         }
     }
 }

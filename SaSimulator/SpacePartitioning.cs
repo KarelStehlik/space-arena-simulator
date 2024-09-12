@@ -30,7 +30,7 @@ namespace SaSimulator
             {
                 for (int y = 0; y < sideCount; y++)
                 {
-                    records[x, y] = new();
+                    records[x, y] = [];
                 }
             }
         }

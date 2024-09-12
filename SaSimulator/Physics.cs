@@ -24,16 +24,16 @@ namespace SaSimulator
             return rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2;
         }
 
-        public static bool ConeCircleIntersect(Vector2 circleCentre, float circleRadius, Vector2 coneOrigin, float coneRotation, float coneAngle)
+        public static bool ConeCircleIntersect(Vector2 circleCenter, float circleRadius, Vector2 coneOrigin, float coneRotation, float coneAngle)
         {
-            Vector2 difference = circleCentre - coneOrigin;
+            Vector2 difference = circleCenter - coneOrigin;
             float angle = (float)Math.Atan2(difference.Y, difference.X);
             float rel = RelativeAngle(angle, coneRotation);
-            if (rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2) // circle centre is in cone
+            if (rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2) // circle center is in cone
             {
                 return true;
             }
-            float dist = Vector2.Distance(circleCentre, coneOrigin);
+            float dist = Vector2.Distance(circleCenter, coneOrigin);
             float angleOfClosestEdgeToCircle = Math.Min(RelativeAngle(angle, coneRotation + coneAngle), RelativeAngle(angle, coneRotation - coneAngle));
             return dist * Math.Abs(Math.Sin(angleOfClosestEdgeToCircle)) < circleRadius;
 

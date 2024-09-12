@@ -16,12 +16,13 @@ namespace SaSimulator
         public bool IsDestroyed { get; protected set; }
         public virtual void Tick(Time dt) { }
         public virtual void Draw(SpriteBatch batch) { }
+        public virtual UniformGrid? BelongsToGrid() { return null; }
     }
 
-    internal class Player
+    internal class Player(List<ModuleBuff> buffs)
     {
         public readonly List<Ship> ships = [];
-        public readonly List<ModuleBuff> buffs = [];
+        public readonly List<ModuleBuff> buffs = buffs;
 
         public void ApplyAllBuffs()
         {
@@ -35,21 +36,21 @@ namespace SaSimulator
         }
     }
 
-    internal class Game(List<ShipInfo> player0, List<ShipInfo> player1, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
+    internal class Game(ShipLists ships, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
     {
-        public readonly Time deltatime = deltatime;
+        public readonly Time deltaTime = deltatime;
         public readonly bool hasGraphics = hasGraphics;
         public enum GameResult { win_0, win_1, draw, unfinished };
-        public GameResult result { get; private set; } = GameResult.unfinished;
-        public readonly Player player0 = new(), player1 = new();
+        public GameResult Result { get; private set; } = GameResult.unfinished;
+        public readonly Player player0 = new(new(ships.player0Buffs)), player1 = new(new(ships.player1Buffs));
         private readonly List<GameObject> gameObjects = [], newGameObjects = [];
-        private readonly List<ShipInfo> player0ShipList = player0, player1ShipList = player1;
-        public Time time { get; private set; } = 0.Seconds();
+        private readonly List<ShipInfo> player0ShipList = ships.player0, player1ShipList = ships.player1;
+        public Time Time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
         // TODO: multiple detection grids for different objects (junk, enemy junk, missiles...)
         // TODO: modify grid density based on number of junk launchers
-        public readonly UniformGrid collisionDetectionGrid = new(10);
+        public readonly UniformGrid hittableP0 = new(10), hittableP1 = new(10), missilesP1 = new(10), missilesP0 = new(10);
         public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
                                                               // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
 
@@ -67,6 +68,8 @@ namespace SaSimulator
                 player1.ships.Add(ship);
                 gameObjects.Add(ship);
             }
+            player0.buffs.AddRange(ships.globalBuffs);
+            player1.buffs.AddRange(ships.globalBuffs);
             player0.ApplyAllBuffs();
             player1.ApplyAllBuffs();
         }
@@ -103,25 +106,25 @@ namespace SaSimulator
         // A reasonable value for lag-free gameplay is 1/30 seconds
         public void Tick()
         {
-            time += deltatime;
-            if (time.Seconds > timeout.Seconds)
+            Time += deltaTime;
+            if (Time.Seconds > timeout.Seconds)
             {
-                result = GameResult.draw;
+                Result = GameResult.draw;
                 return;
             }
-            DamageScaling = 1 + (float)(time.Seconds > 25 ? ((time.Seconds - 25) * 0.03) : 0);
+            DamageScaling = 1 + (float)(Time.Seconds > 25 ? ((Time.Seconds - 25) * 0.03) : 0);
 
             // detect if a player has won
             player0.ships.RemoveAll(ship => ship.IsDestroyed);
             player1.ships.RemoveAll(ship => ship.IsDestroyed);
             if (player0.ships.Count == 0)
             {
-                result = player1.ships.Count == 0 ? GameResult.draw : GameResult.win_1;
+                Result = player1.ships.Count == 0 ? GameResult.draw : GameResult.win_1;
                 return;
             }
             if (player1.ships.Count == 0)
             {
-                result = GameResult.win_0;
+                Result = GameResult.win_0;
                 return;
             }
 
@@ -133,16 +136,20 @@ namespace SaSimulator
             newGameObjects.Clear();
 
             // populate collision detection
-            collisionDetectionGrid.Reset(GetBounds());
+            var bounds = GetBounds();
+            hittableP0.Reset(bounds);
+            hittableP1.Reset(bounds);
+            missilesP0.Reset(bounds);
+            missilesP1.Reset(bounds);
             foreach (GameObject obj in gameObjects)
             {
-                collisionDetectionGrid.Add(obj);
+                obj.BelongsToGrid()?.Add(obj);
             }
 
             // game tick
             foreach (GameObject obj in gameObjects)
             {
-                obj.Tick(deltatime);
+                obj.Tick(deltaTime);
             }
         }
 

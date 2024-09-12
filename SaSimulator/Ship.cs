@@ -1,6 +1,9 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿// Ignore Spelling: Aoe
+
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using static SaSimulator.Physics;
@@ -32,7 +35,7 @@ namespace SaSimulator
             public readonly List<Shield> coveringShields = [];
         }
 
-        private readonly float MOVEMENT_DAMPENING = 0.8f;
+        private readonly float MOVEMENT_DAMPENING = 0.75f;
         private readonly float ROTATION_DAMPENING = 0.1f;
 
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
@@ -44,6 +47,7 @@ namespace SaSimulator
         public readonly int side;
         private Speed acceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
         private float turnPower, turningVelocity = 0;
+        private Distance maxWeaponRange = 0.Cells();
 
 
         public Ship(ShipInfo info, Game game, int side) : base(game)
@@ -74,6 +78,10 @@ namespace SaSimulator
                     if (component is Shield shield)
                     {
                         maxShieldRadius = Math.Max(maxShieldRadius, (int)shield.Radius.Cells);
+                    }
+                    if(component is Gun gun)
+                    {
+                        maxWeaponRange = Math.Max(maxWeaponRange.Cells, gun.Range.Cells).Cells();
                     }
                 }
             }
@@ -144,7 +152,7 @@ namespace SaSimulator
         {
             foreach (Module module in modules)
             {
-                module.AppyBuff(buff);
+                module.ApplyBuff(buff);
             }
         }
 
@@ -163,14 +171,44 @@ namespace SaSimulator
             return modulesAlive < initialModuleNumber * 0.3;
         }
 
+        private enum MovementAction { Forward, Retreat, CircleLeft, CircleRight };
+        private static MovementAction[] possibleMoveActions = Enum.GetValues(typeof(MovementAction)).OfType<MovementAction>().ToArray();
+        private Time movementActionRemainingDuration = 2.Seconds();
+        private MovementAction currentAction = MovementAction.Forward;
+        private static readonly Time movementActionMaxDuration = 2f.Seconds();
         // [speculative game mechanic] Ships always turn towards the enemy main,
         // however that is all we really know about movement patterns.
         // sometimes they rush forward, sometimes they fly away and sometimes they try to circle it.
         // How exactly this works is still mysterious.
         private void Accelerate(Time dt)
         {
-            vx += acceleration * (float)Math.Cos(WorldPosition.rotation) * dt.Seconds;
-            vy += acceleration * (float)Math.Sin(WorldPosition.rotation) * dt.Seconds;
+            float accelAngle = WorldPosition.rotation;
+            switch (currentAction)
+            {
+                case MovementAction.Forward:
+                    break;
+                case MovementAction.Retreat:
+                    accelAngle += (float)Math.PI; break;
+                case MovementAction.CircleLeft:
+                    accelAngle -= (float)Math.PI/2; break;
+                case MovementAction.CircleRight:
+                    accelAngle += (float)Math.PI/2; break;
+            }
+            vx += acceleration * (float)Math.Cos(accelAngle) * dt.Seconds;
+            vy += acceleration * (float)Math.Sin(accelAngle) * dt.Seconds;
+            movementActionRemainingDuration -= dt;
+            if (movementActionRemainingDuration.Seconds <= 0)
+            {
+                movementActionRemainingDuration = movementActionMaxDuration;
+                currentAction = possibleMoveActions[game.rng.Next(possibleMoveActions.Length)];
+                float distanceToEnemyMain = Vector2.Distance(GetEnemies()[0].WorldPosition.Position, WorldPosition.Position);
+                if (currentAction == MovementAction.Retreat && distanceToEnemyMain > maxWeaponRange.Cells * 0.8f ||
+                    distanceToEnemyMain > maxWeaponRange.Cells * 1.2f)
+                {
+                    currentAction = MovementAction.Forward; // if enemy main is past weapon range, we don't retreat
+                }
+            }
+
         }
 
         public override void Tick(Time dt)
@@ -193,8 +231,9 @@ namespace SaSimulator
                 Accelerate(dt);
 
                 turningVelocity *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
-                vx *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
-                vy *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
+                float moveDamping = (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
+                vx *= moveDamping;
+                vy *= moveDamping;
 
                 WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity * dt.Seconds);
             }
@@ -227,6 +266,11 @@ namespace SaSimulator
             {
                 module.Draw(batch);
             }
+        }
+
+        public override UniformGrid? BelongsToGrid()
+        {
+            return side==0? game.hittableP0 : game.hittableP1;
         }
 
         // removes a shield completely from covering any cells. This is very slow, and should basically never be called.

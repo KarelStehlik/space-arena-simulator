@@ -17,15 +17,15 @@ namespace SaSimulator
     {
         public Camera camera = new();
         private static MonoGameWindow? _instance;
-        private GraphicsDeviceManager _graphics;
+        private readonly GraphicsDeviceManager _graphics;
         private SpriteBatch? _spriteBatch;
-        private Game game;
+        private readonly Game game;
         private float gamespeeed;
         private Time desiredGameTime = 0.Seconds();
 
-        public static void Init(Game game, float gamespeed)
+        public static void Init(Game game, float gameSpeed)
         {
-            _instance = new(game, gamespeed);
+            _instance = new(game, gameSpeed);
         }
 
         public static MonoGameWindow Instance
@@ -69,13 +69,13 @@ namespace SaSimulator
 
         protected override void Update(GameTime gameTime)
         {
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape) || game.result != Game.GameResult.unfinished)
+            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape) || game.Result != Game.GameResult.unfinished)
                 Exit();
 
             base.Update(gameTime);
 
             desiredGameTime += ((float)gameTime.ElapsedGameTime.TotalSeconds).Seconds() * gamespeeed;
-            while (game.time.Seconds < desiredGameTime.Seconds)
+            while (game.Time.Seconds < desiredGameTime.Seconds)
             {
                 game.Tick();
             }
@@ -86,6 +86,12 @@ namespace SaSimulator
         {
             GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.Black);
 
+#if DEBUG
+            if(_spriteBatch == null)
+            {
+                throw new Exception("Sprite batch not initialized");
+            }
+#endif
             _spriteBatch.Begin();
 
             // zoom and center the camera

@@ -4,25 +4,53 @@ using System.IO;
 
 namespace SaSimulator
 {
-    class ShipLists(List<ShipInfo> player0, List<ShipInfo> player1)
+    class ShipLists()
     {
-        public readonly List<ShipInfo> player0 = player0, player1 = player1;
+        public readonly List<ModuleBuff> globalBuffs = [], player0Buffs = [], player1Buffs = [];
+        public readonly List<ShipInfo> player0 = [], player1 = [];
     }
     internal class FileLoading
     {
+        public static void ReadModuleBuffsInto(string[] lines, List<ModuleBuff> buffs)
+        {
+            foreach (var line in lines)
+            {
+                var ModuleStatAmount = line.Split(' ');
+                if (!Enum.TryParse(ModuleStatAmount[0], true, out ModuleTag module))
+                {
+                    throw new ArgumentException($"No such module tag: {ModuleStatAmount[0]}");
+                }
+                if (!Enum.TryParse(ModuleStatAmount[1], true, out StatType stat))
+                {
+                    throw new ArgumentException($"No such module stat: {ModuleStatAmount[1]}");
+                }
+                if (!float.TryParse(ModuleStatAmount[2], out float amount))
+                {
+                    throw new ArgumentException($"Invalid stat multiplier: {ModuleStatAmount[1]}");
+                }
+                buffs.Add(new(amount, stat, module));
+            }
+        }
+
         public static ShipLists Read(string filename)
         {
-            List<ShipInfo> player0 = [], player1 = [];
+            ShipLists result = new();
 
             var Players = File.ReadAllText(filename).Split("--- new player ---", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            string globalArgs = Players[0]; // TODO: global modifiers, such as space arena anomalies or default module level
-            for (int i = 1; i < Players.Length; i++)
+
+            string[] globalArgs = Players[0].Split('\n'); // global modifiers, such as space arena anomalies module levels
+            ReadModuleBuffsInto(globalArgs, result.globalBuffs);
+
+            for (int i = 1; i < Players.Length; i++)  // process the player
             {
                 var ships = Players[i].Split("--- new ship ---", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                string playerArgs = ships[0]; // TODO: player specific modifiers, such as ship bonus
-                for (int s = 1; s < ships.Length; s++)
+
+                string[] playerArgs = ships[0].Split('\n'); // player specific modifiers, such as ship bonus
+                ReadModuleBuffsInto(playerArgs, i==1? result.player0Buffs : result.player1Buffs);
+
+                for (int s = 1; s < ships.Length; s++)   // process the ship
                 {
-                    ShipInfo shipInfo = new(); // TODO: ship speed, turning
+                    ShipInfo shipInfo = new(); // ship speed, turning
                     var lines = ships[s].Split('\n');
                     var shipArgs = lines[0].Split(' ');
                     shipInfo.speed = float.Parse(shipArgs[0]).CellsPerSecond();
@@ -38,12 +66,12 @@ namespace SaSimulator
                             shipInfo.modules.Add(new(moduleName, x, y));
                         }
                     }
-                    var shipList = i == 1 ? player0 : player1;
+                    var shipList = i == 1 ? result.player0 : result.player1;
                     shipList.Add(shipInfo);
                 }
 
             }
-            return new(player0, player1);
+            return result;
         }
     }
 }
