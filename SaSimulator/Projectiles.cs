@@ -201,8 +201,14 @@ namespace SaSimulator
     {
         float radius = radius;
 
+        public virtual void ShootDown()
+        {
+            IsDestroyed = true;
+        }
+
         public override void Tick(Time dt)
         {
+            if(IsDestroyed) return; // this was shot down by point defense
             if (target != null && !target.IsDestroyed)
             {
                 // rotate towards target
@@ -257,6 +263,31 @@ namespace SaSimulator
         public override UniformGrid? BelongsToGrid()
         {
             return side==0? game.missilesP0 : game.missilesP1;
+        }
+    }
+
+    internal class Torpedo(Game game, Transform transform, Speed speed, Time duration, float radius, float damage, int side, Color color) :
+        Missile(game, transform, speed, duration, radius, damage, side, color, null, 0)
+    {
+    }
+
+    internal class Mine(Game game, Transform transform, Speed speed, Time duration, float radius, float damage, int side, Color color) :
+        Missile(game, transform, speed, duration, radius, damage, side, color, null, 0)
+    {
+        private static readonly float SPEED_DAMPING = 0.9f;
+
+        public override void Tick(Time dt)
+        {
+            float damping = (float)Math.Pow(SPEED_DAMPING, dt.Seconds);
+            vx *= damping;
+            vy *= damping;
+            base.Tick(dt);
+        }
+        public override void Draw(SpriteBatch batch)
+        {
+            Sprite sprite = new("mine") { Size = new(1.5f, 1.5f) };
+            sprite.SetTransform(WorldPosition);
+            sprite.Draw(batch);
         }
     }
 

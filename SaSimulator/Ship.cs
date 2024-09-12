@@ -3,6 +3,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -41,22 +42,27 @@ namespace SaSimulator
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
                                         // Each module is stored here once for every cell it covers
         private readonly List<Module> modules = []; // stores each module once
+        private readonly int cellCount = 0; // # of cells occupied by modules
         private readonly int initialModuleNumber;
-        public int modulesAlive;
+        public int modulesAlive=0;
         private readonly int width = 0, height = 0; // in cells
         public readonly int side;
-        private Speed acceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
-        private float turnPower, turningVelocity = 0;
-        private Distance maxWeaponRange = 0.Cells();
+        private Speed baseAcceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
+        private float baseTurnAcceleration, turningVelocity = 0;
 
+        public float turnPower=0, thrust=0, mass=1, energy=0, energyUse=0, warpForce=0; // these are recalculated every tick
+
+        private float energyPhase = 0, warpProgress = 0;
+        private Time energyCycleDuration = 5.Seconds();
+        private Distance maxWeaponRange = 0.Cells();
 
         public Ship(ShipInfo info, Game game, int side) : base(game)
         {
             this.side = side;
             WorldPosition = side == 0 ? new(0.Cells(), 100.Cells(), -(float)Math.PI / 2) : new(50.Cells(), 0.Cells(), (float)Math.PI / 2);
             WorldPosition += new Transform(game.rng.Next(5).Cells(), game.rng.Next(50).Cells(), 0);
-            acceleration = info.speed;
-            turnPower = info.turnSpeed;
+            baseAcceleration = info.speed;
+            baseTurnAcceleration = info.turnSpeed;
 
             int maxShieldRadius = 0;
 
@@ -68,12 +74,13 @@ namespace SaSimulator
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
                 modules.Add(module);
+                cellCount += module.width * module.height;
 
                 // determine ship width and height
                 width = Math.Max(width, placement.x + module.width);
                 height = Math.Max(height, placement.y + module.height);
 
-                foreach (IModuleComponent component in module.components)
+                foreach (ModuleComponent component in module.components)
                 {
                     if (component is Shield shield)
                     {
@@ -93,7 +100,7 @@ namespace SaSimulator
             cells = new Cell[width, height];
 
             size = Math.Max(width, height).Cells() / (float)Math.Sqrt(2);
-            initialModuleNumber = modulesAlive = modules.Count;
+            initialModuleNumber = modules.Count;
 
             // fill ship grid
             foreach (Module module in modules)
@@ -118,7 +125,8 @@ namespace SaSimulator
             // activate shields
             foreach (Module module in modules)
             {
-                foreach (IModuleComponent component in module.components)
+                module.Initialize();
+                foreach (ModuleComponent component in module.components)
                 {
                     if (component is Shield shield)
                     {
@@ -126,6 +134,12 @@ namespace SaSimulator
                     }
                 }
             }
+        }
+
+        // A ship is only active [energy/energyUse] of the time.
+        private bool IsPowered()
+        {
+            return energyPhase * energyUse < energy;
         }
 
         public Module? GetNearestModule(Vector2 worldPosition)
@@ -166,6 +180,8 @@ namespace SaSimulator
             return side == 0 ? game.player1.ships : game.player0.ships;
         }
 
+        // there are 3 known conditions of ship destruction: no weapons (unless this is a main ship and still has supports), no power, or "seriously damaged."
+        // [speculative game mechanic] it is unclear what "seriously damaged" means.
         private bool IsCriticallyDamaged()
         {
             return modulesAlive < initialModuleNumber * 0.3;
@@ -194,6 +210,7 @@ namespace SaSimulator
                 case MovementAction.CircleRight:
                     accelAngle += (float)Math.PI/2; break;
             }
+            Speed acceleration = baseAcceleration + thrust.CellsPerSecond() / mass;
             vx += acceleration * (float)Math.Cos(accelAngle) * dt.Seconds;
             vy += acceleration * (float)Math.Sin(accelAngle) * dt.Seconds;
             movementActionRemainingDuration -= dt;
@@ -208,43 +225,38 @@ namespace SaSimulator
                     currentAction = MovementAction.Forward; // if enemy main is past weapon range, we don't retreat
                 }
             }
-
         }
 
         public override void Tick(Time dt)
         {
-            Ship enemyMain = GetEnemies()[0];
+            // passive actions
+            turningVelocity *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
+            float moveDamping = (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
+            vx *= moveDamping;
+            vy *= moveDamping;
+            WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity * dt.Seconds);
 
-            // do movement
+            modules.RemoveAll(m => m.IsDestroyed);
+
+            if (IsCriticallyDamaged())
             {
-                // determine whether the enemy is to the left of this ship
-                float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
-                if (IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
-                {
-                    turningVelocity += turnPower * dt.Seconds;
-                }
-                else
-                {
-                    turningVelocity -= turnPower * dt.Seconds;
-                }
-
-                Accelerate(dt);
-
-                turningVelocity *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
-                float moveDamping = (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
-                vx *= moveDamping;
-                vy *= moveDamping;
-
-                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity * dt.Seconds);
+                IsDestroyed = true;
+                return;
             }
 
-            // process damage taken
+            turnPower = 0; thrust = 0; mass = 1; energy = 0; energyUse = 0; warpForce = 0;
+
+            foreach (Module module in modules)
             {
-                if (IsCriticallyDamaged())
-                {
-                    IsDestroyed = true;
-                    return;
-                }
+                module.UpdatePosition();
+                module.ProcessEnergy();
+            }
+
+            energyPhase += dt / energyCycleDuration;
+            energyPhase %= 1;
+            if (!IsPowered())
+            {
+                return; // everything past this point requires power
             }
 
             // tick modules
@@ -253,6 +265,24 @@ namespace SaSimulator
                 {
                     module.Tick(dt);
                 }
+            }
+
+            Ship enemyMain = GetEnemies()[0];
+
+            // do movement
+            {
+                // determine whether the enemy is to the left of this ship
+                float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
+                if (IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
+                {
+                    turningVelocity += (baseTurnAcceleration+turnPower/mass) * dt.Seconds;
+                }
+                else
+                {
+                    turningVelocity -= (baseTurnAcceleration + turnPower / mass) * dt.Seconds;
+                }
+
+                Accelerate(dt);
             }
         }
 
@@ -265,6 +295,12 @@ namespace SaSimulator
             foreach (Module module in modules)
             {
                 module.Draw(batch);
+            }
+            if (!IsPowered())
+            {
+                Sprite sprite = new("power") { Size = new(size.Cells,size.Cells) };
+                sprite.SetTransform(WorldPosition);
+                sprite.Draw(batch);
             }
         }
 
