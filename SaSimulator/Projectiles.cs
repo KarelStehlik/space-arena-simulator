@@ -1,9 +1,8 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using static SaSimulator.Physics;
 using static SaSimulator.Ship;
-using Microsoft.Xna.Framework;
-using System.Linq;
 
 namespace SaSimulator
 {
@@ -64,7 +63,7 @@ namespace SaSimulator
 
         public override void Tick(Time dt)
         {
-            foreach (GameObject potentialTarget in game.collisionDetectionGrid.Get(WorldPosition,(speed*dt)))
+            foreach (GameObject potentialTarget in game.collisionDetectionGrid.Get(WorldPosition, (speed * dt)))
             {
                 if (!potentialTarget.IsDestroyed && potentialTarget is Ship target && target.side != side)
                 {
@@ -139,7 +138,7 @@ namespace SaSimulator
 
 
     internal class Laser(Game game, Transform transform, Distance length, float damage, int side, Color color) :
-        Projectile(game, transform, length/1.Seconds(), 0.Seconds(), damage, side, color)
+        Projectile(game, transform, length / 1.Seconds(), 0.Seconds(), damage, side, color)
     {
         public override void Tick(Time dt)
         {
@@ -177,7 +176,7 @@ namespace SaSimulator
 
         public override void Tick(Time dt)
         {
-            if (target!=null && !target.IsDestroyed)
+            if (target != null && !target.IsDestroyed)
             {
                 // rotate towards target
                 float leftSide = (WorldPosition.rotation + (float)Math.PI / 2);
@@ -190,7 +189,7 @@ namespace SaSimulator
                 {
                     newRotation -= turningSpeed * dt.Seconds;
                 }
-                WorldPosition = new(WorldPosition.x,WorldPosition.y, newRotation);
+                WorldPosition = new(WorldPosition.x, WorldPosition.y, newRotation);
 
                 vx = speed * (float)Math.Cos(newRotation);
                 vy = speed * (float)Math.Sin(newRotation);
@@ -218,7 +217,7 @@ namespace SaSimulator
             if (hit.cell.module.IsDestroyed)
             {
                 Time travelTime = hit.traveled / speed;
-                explosionOrigin=target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).WorldPosition.Position;
+                explosionOrigin = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).WorldPosition.Position;
             }
             target.TakeAoeDamage(explosionOrigin, radius.Cells(), damage, DamageType.Explosive);
             IsDestroyed = true;

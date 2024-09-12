@@ -8,8 +8,11 @@ using static SaSimulator.Physics;
 namespace SaSimulator
 {
     enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine }
-    enum StatType { Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range,
-        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius, ExplosionRadius }
+    enum StatType
+    {
+        Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range,
+        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius, ExplosionRadius
+    }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
     {
@@ -94,7 +97,7 @@ namespace SaSimulator
             sprite.SetTransform(ref WorldPosition);
             sprite.Color = IsDestroyed ? Color.Black : new(1 - (float)currentHealthFraction, (float)currentHealthFraction, 0);
             sprite.Draw(batch);
-            foreach(var component in components)
+            foreach (var component in components)
             {
                 component.Draw(batch, this);
             }
@@ -148,7 +151,7 @@ namespace SaSimulator
         static readonly StatType[] BaseModuleStats = [StatType.Health, StatType.Health, StatType.Health, StatType.Health, StatType.Health];
         public void AppyBuff(ModuleBuff buff)
         {
-            if(buff.targetModule == ModuleTag.Any)
+            if (buff.targetModule == ModuleTag.Any)
             {
                 ApplyBuffUnchecked(buff);
                 return;
@@ -156,7 +159,7 @@ namespace SaSimulator
 
             foreach (IModuleComponent component in components)
             {
-                if (component.Tags.Contains(buff.targetModule)) 
+                if (component.Tags.Contains(buff.targetModule))
                 {
                     if (BaseModuleStats.Contains(buff.stat)) // buff matches one of the component's tags but applies to basic stats
                     {
@@ -188,7 +191,7 @@ namespace SaSimulator
 
     internal interface IModuleComponent
     {
-        ModuleTag[] Tags {get;}
+        ModuleTag[] Tags { get; }
         void Tick(Time dt, Module thisModule);
         void OnDestroyed(Module module);
         void ApplyBuff(ModuleBuff buff); // assumes the buff should affect this module and modifies one of the base module stats
@@ -202,11 +205,11 @@ namespace SaSimulator
     // probably because the shields broke.
     internal class Shield(float strength, Distance radius, float regenRate, float maxRegen) : IModuleComponent
     {
-        private Attribute<float> strength=new(strength);
+        private Attribute<float> strength = new(strength);
         private Attribute<Distance> radius = new(radius);
         public Distance Radius { get { return radius; } }
-        private Attribute<float> regenRate=new(regenRate);
-        private Attribute<float> maxRegen=new(maxRegen);
+        private Attribute<float> regenRate = new(regenRate);
+        private Attribute<float> maxRegen = new(maxRegen);
         private float regenRemainingFraction = 1, strengthRemainingFraction = 1;
         private bool mustReapply = false;
         private Sprite? sprite;
@@ -252,7 +255,7 @@ namespace SaSimulator
                 thisModule.ship.RemoveShield(this);
                 thisModule.ship.AddShield(this, thisModule, radius);
             }
-            if(strengthRemainingFraction < 1)
+            if (strengthRemainingFraction < 1)
             {
                 float regenAmount = Math.Min(regenRate, regenRemainingFraction * maxRegen);
                 regenRemainingFraction -= regenAmount / maxRegen;
@@ -434,7 +437,7 @@ namespace SaSimulator
 
     internal class LaserGun(float firerate, Time duration,
         Distance range, float firingArc,
-        float damage) : Gun(range, firingArc, 0,damage, firerate)
+        float damage) : Gun(range, firingArc, 0, damage, firerate)
     {
         Time duration = duration;
         bool currentlyFiring = false;
@@ -459,7 +462,7 @@ namespace SaSimulator
                 if (currentlyFiring)
                 {
                     currentlyFiring = false;
-                    currentPhaseRemainingDuration = (1/fireRate).Seconds();
+                    currentPhaseRemainingDuration = (1 / fireRate).Seconds();
                 }
                 return;
             }

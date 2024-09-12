@@ -69,9 +69,9 @@ namespace SaSimulator
                 width = Math.Max(width, placement.x + module.width);
                 height = Math.Max(height, placement.y + module.height);
 
-                foreach(IModuleComponent component in module.components)
+                foreach (IModuleComponent component in module.components)
                 {
-                    if(component is Shield shield)
+                    if (component is Shield shield)
                     {
                         maxShieldRadius = Math.Max(maxShieldRadius, (int)shield.Radius.Cells);
                     }
@@ -103,16 +103,16 @@ namespace SaSimulator
                         cells[x, y] = new(module);
                     }
                 }
-                // set module position relative to ship centre
-                module.relativePosition += new Transform((-width + module.width + 2*maxShieldRadius).Cells() / 2, (-height + module.height + 2*maxShieldRadius).Cells() / 2, 0);
+                // set module position relative to ship center
+                module.relativePosition += new Transform((-width + module.width + 2 * maxShieldRadius).Cells() / 2, (-height + module.height + 2 * maxShieldRadius).Cells() / 2, 0);
             }
 
             // activate shields
-            foreach(Module module in modules)
+            foreach (Module module in modules)
             {
-                foreach(IModuleComponent component in module.components)
+                foreach (IModuleComponent component in module.components)
                 {
-                    if(component is Shield shield)
+                    if (component is Shield shield)
                     {
                         AddShield(shield, module, shield.Radius);
                     }
@@ -142,14 +142,14 @@ namespace SaSimulator
 
         public void ApplyModuleBuff(ModuleBuff buff)
         {
-            foreach(Module module in modules)
+            foreach (Module module in modules)
             {
                 module.AppyBuff(buff);
             }
         }
 
         public Player ThisPlayer()
-        { 
+        {
             return side == 0 ? game.player0 : game.player1;
         }
 
@@ -161,6 +161,16 @@ namespace SaSimulator
         private bool IsCriticallyDamaged()
         {
             return modulesAlive < initialModuleNumber * 0.3;
+        }
+
+        // [speculative game mechanic] Ships always turn towards the enemy main,
+        // however that is all we really know about movement patterns.
+        // sometimes they rush forward, sometimes they fly away and sometimes they try to circle it.
+        // How exactly this works is still mysterious.
+        private void Accelerate(Time dt)
+        {
+            vx += acceleration * (float)Math.Cos(WorldPosition.rotation) * dt.Seconds;
+            vy += acceleration * (float)Math.Sin(WorldPosition.rotation) * dt.Seconds;
         }
 
         public override void Tick(Time dt)
@@ -180,14 +190,13 @@ namespace SaSimulator
                     turningVelocity -= turnPower * dt.Seconds;
                 }
 
-                vx += acceleration * (float)Math.Cos(WorldPosition.rotation) * dt.Seconds;
-                vy += acceleration * (float)Math.Sin(WorldPosition.rotation) * dt.Seconds;
+                Accelerate(dt);
 
                 turningVelocity *= (float)Math.Pow(ROTATION_DAMPENING, dt.Seconds);
                 vx *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
                 vy *= (float)Math.Pow(MOVEMENT_DAMPENING, dt.Seconds);
 
-                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity*dt.Seconds);
+                WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity * dt.Seconds);
             }
 
             // process damage taken
@@ -224,12 +233,12 @@ namespace SaSimulator
         // Instead, we will simply ignore depleted shields when processing hits.
         public void RemoveShield(Shield shield)
         {
-            for(int x=0; x<cells.GetLength(0); x++)
+            for (int x = 0; x < cells.GetLength(0); x++)
             {
-                for(int y=0; y<cells.GetLength(1); y++)
+                for (int y = 0; y < cells.GetLength(1); y++)
                 {
                     Cell? cell = cells[x, y];
-                    if (cell!=null && cell.coveringShields.Contains(shield))
+                    if (cell != null && cell.coveringShields.Contains(shield))
                     {
                         cell.coveringShields.Remove(shield);
                     }
@@ -238,7 +247,7 @@ namespace SaSimulator
         }
 
 
-        // adds a shield to all cells whose centre it covers. Doesn't generate new cells beyond the current 2d array,
+        // adds a shield to all cells whose center it covers. Doesn't generate new cells beyond the current 2d array,
         // (as we would need to reallocate everything and change a bunch of the ship's properties),
         // so a shield added this way which reaches past the ship will not have collisions beyond the ship's current borders.
         // There is no way in space arena to add shields or increase their size after ship creation, so this shouldn't be an issue.
@@ -246,22 +255,22 @@ namespace SaSimulator
         {
             float middleCellX = source.relativePosition.x.Cells + width / 2;
             float middleCellY = source.relativePosition.y.Cells + height / 2;
-            int minX = (int)(middleCellX - radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=2 cell whose centre is at 2.5.
+            int minX = (int)(middleCellX - radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=2 cell whose center is at 2.5.
             int minY = (int)(middleCellY - radius.Cells - 0.4f);
-            int maxX = (int)(middleCellX + radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=6 cell whose centre is at 6.5.
+            int maxX = (int)(middleCellX + radius.Cells - 0.4f); // shield origin at x=4.5, radius 2 should just barely cover the x=6 cell whose center is at 6.5.
             int maxY = (int)(middleCellY + radius.Cells - 0.4f);
             minX = Math.Max(0, minX);
             minY = Math.Max(0, minY);
-            maxX = Math.Min(maxX, cells.GetLength(0)-1);
-            maxY = Math.Min(maxY, cells.GetLength(1)-1);
+            maxX = Math.Min(maxX, cells.GetLength(0) - 1);
+            maxY = Math.Min(maxY, cells.GetLength(1) - 1);
 
-            for(int x=minX; x<=maxX; x++)
+            for (int x = minX; x <= maxX; x++)
             {
-                for(int y=minY; y<=maxY; y++)
+                for (int y = minY; y <= maxY; y++)
                 {
-                    if(Vector2.Distance(new(middleCellX,middleCellY), new(x+.5f,y+.5f)) < radius.Cells)
+                    if (Vector2.Distance(new(middleCellX, middleCellY), new(x + .5f, y + .5f)) < radius.Cells)
                     {
-                        if(cells[x, y] == null)
+                        if (cells[x, y] == null)
                         {
                             cells[x, y] = new(null);
                         }
@@ -271,7 +280,7 @@ namespace SaSimulator
             }
         }
 
-        // damages all modules in cells whose centre lies in the AOE.
+        // damages all modules in cells whose center lies in the AOE.
         // [speculative game mechanic] This aoe is a square, which is evidently correct for reactor explosions, less clear for missiles.
         // [speculative game mechanic] each module will only take damage from this once, even if multiple of its cells are affected.
         public void TakeAoeDamage(Vector2 originWorldPos, Distance radius, float amount, DamageType type)
@@ -319,17 +328,17 @@ namespace SaSimulator
             Vector2 lowestCorner = new(-width / 2f, -height / 2f);
 
             float stepSize = 0.8f;
-            Vector2 step = new Vector2((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation))*stepSize;
+            Vector2 step = new Vector2((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation)) * stepSize;
             Vector2 pos = ray.Position - lowestCorner;
 
             // commence simple search
-            for (int i = 0; i*stepSize <= rayLength.Cells; i++)
+            for (int i = 0; i * stepSize <= rayLength.Cells; i++)
             {
                 if (pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)
                 {
                     if (cells[(int)pos.X, (int)pos.Y] != null)
                     {
-                        yield return new(cells[(int)pos.X, (int)pos.Y], stepSize.Cells()*i);
+                        yield return new(cells[(int)pos.X, (int)pos.Y], stepSize.Cells() * i);
                     }
                 }
                 pos += step;

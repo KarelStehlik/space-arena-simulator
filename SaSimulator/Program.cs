@@ -8,7 +8,7 @@ namespace SaSimulator
 {
     public class Options
     {
-        [Option('F', "file", Required = true, Default = false, HelpText = "File to lod ships from")]
+        [Option('F', "file", Required = true, Default = false, HelpText = "File to load ships from")]
         public string File { get; set; } = "";
         [Option('G', "graphics", Required = false, Default = false, HelpText = "Use graphics window to view the battle.")]
         public bool Graphics { get; set; }
@@ -64,12 +64,12 @@ namespace SaSimulator
 
                 for (int i = 0; i < o.NumberSims; i++)
                 {
-                    ThreadPool.QueueUserWorkItem(Simulate, new SimulationInfo(a,b,o,rng.Next(), results));
+                    ThreadPool.QueueUserWorkItem(Simulate, new SimulationInfo(a, b, o, rng.Next(), results));
                 }
                 results.done.WaitOne();
 
                 Console.WriteLine($"Blue player (p0) has {results.win0} wins, {results.draw} draws, {results.win1} losses.");
-                Console.WriteLine($"Winrate {results.win0 / (float)(results.win0 + results.win1) * 100:0.00}%");
+                Console.WriteLine($"Win rate {results.win0 / (float)(results.win0 + results.win1) * 100:0.00}%");
                 stopwatch.Stop();
                 Console.WriteLine($"elapsed: {stopwatch.ElapsedMilliseconds} ms");
             }
@@ -84,15 +84,15 @@ namespace SaSimulator
 
         class SimulationInfo(List<ShipInfo> a, List<ShipInfo> b, Options o, int randomSeed, SimulationResults results)
         {
-            public readonly List<ShipInfo> shipsA=a, shipsB=b;
-            public readonly Options options=o;
+            public readonly List<ShipInfo> shipsA = a, shipsB = b;
+            public readonly Options options = o;
             public readonly int randomSeed = randomSeed;
             public readonly SimulationResults results = results;
         }
 
         static void Simulate(object? simulationInfo)
         {
-            if(simulationInfo==null || simulationInfo is not SimulationInfo info)
+            if (simulationInfo == null || simulationInfo is not SimulationInfo info)
             {
                 return;
             }
@@ -116,7 +116,7 @@ namespace SaSimulator
                     System.Threading.Interlocked.Increment(ref info.results.draw);
                     break;
             }
-            if(System.Threading.Interlocked.Decrement(ref info.results.remaining) == 0)
+            if (System.Threading.Interlocked.Decrement(ref info.results.remaining) == 0)
             {
                 info.results.done.Set();
             }

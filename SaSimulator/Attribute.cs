@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+﻿using System.Numerics;
 
 namespace SaSimulator
 {
-    internal struct Attribute<T> where T: IMultiplyOperators<T,float,T>
+    internal struct Attribute<T> where T : IMultiplyOperators<T, float, T>
     {
         private T baseValue;
         private float increase;
@@ -20,7 +13,7 @@ namespace SaSimulator
         {
             Value = baseValue * increase;
         }
-        public T Value {  get; private set; }
+        public T Value { get; private set; }
         public static implicit operator T(Attribute<T> a) => a.Value;
         public Attribute(T value)
         {

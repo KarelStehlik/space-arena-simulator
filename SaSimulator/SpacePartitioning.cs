@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
     // splits a target area into rectangular chunks.
     // GameObjects are stored in each of the chunks that they occupy.
-    // When we wish to apply some local effect, we only need to consider GameObjects in chunks touched by this efect.
-    // This should generally lead to better performance than iterating through all gme objects, though the worst-case asymptotic complexity is terrible.
+    // When we wish to apply some local effect, we only need to consider GameObjects in chunks touched by this effect.
+    // This should generally lead to better performance than iterating through all game objects, though the worst-case asymptotic complexity is terrible.
     internal class UniformGrid
     {
         private class Record(GameObject storedObject)
@@ -31,9 +26,9 @@ namespace SaSimulator
         public UniformGrid(int sideCount)
         {
             records = new List<Record>[sideCount, sideCount];
-            for(int x=0;x<sideCount;x++)
+            for (int x = 0; x < sideCount; x++)
             {
-                for(int y = 0; y < sideCount; y++)
+                for (int y = 0; y < sideCount; y++)
                 {
                     records[x, y] = new();
                 }
@@ -42,7 +37,7 @@ namespace SaSimulator
 
         public void Reset(RectangleF bounds)
         {
-            foreach(List<Record> list in records)
+            foreach (List<Record> list in records)
             {
                 list.Clear();
             }
@@ -52,7 +47,7 @@ namespace SaSimulator
             chunkHeight = bounds.Height.Cells() / records.GetLength(1);
         }
 
-        
+
         private struct Bounds
         {
             public int minX;
@@ -82,16 +77,16 @@ namespace SaSimulator
         {
             Bounds bounds = GetBoundsOf(obj);
             Record record = new(obj);
-            for (int x = bounds.minX; x <=  bounds.maxX; x++)
+            for (int x = bounds.minX; x <= bounds.maxX; x++)
             {
-                for(int y = bounds.minY;  y <= bounds.maxY; y++)
+                for (int y = bounds.minY; y <= bounds.maxY; y++)
                 {
                     records[x, y].Add(record);
                 }
             }
         }
 
-        // retutn all objects in a given circle.
+        // return all objects in a given circle.
         public IEnumerable<GameObject> Get(Distance x, Distance y, Distance radius)
         {
             searchId++;
@@ -100,9 +95,10 @@ namespace SaSimulator
             {
                 for (int yChunk = bounds.minY; yChunk <= bounds.maxY; yChunk++)
                 {
-                    foreach(Record record in records[xChunk,yChunk]) {
-                        if(record.lastAccess != searchId &&
-                            Vector2.DistanceSquared(record.storedObject.WorldPosition.Position, new(x.Cells,y.Cells)) < Physics.Square(radius.Cells+record.storedObject.size.Cells))
+                    foreach (Record record in records[xChunk, yChunk])
+                    {
+                        if (record.lastAccess != searchId &&
+                            Vector2.DistanceSquared(record.storedObject.WorldPosition.Position, new(x.Cells, y.Cells)) < Physics.Square(radius.Cells + record.storedObject.size.Cells))
                         {
                             yield return record.storedObject;
                             record.lastAccess = searchId;
@@ -154,21 +150,20 @@ namespace SaSimulator
         // return all objects hit by a given ray, approximately in order (not guaranteed).
         public IEnumerable<GameObject> Get(Transform origin, Distance length)
         {
-            // TODO: optimize
             searchId++;
             float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation);
 
             bool steppingY = Math.Abs(sin) > Math.Abs(cos);
-            Vector2 step = steppingY ? new(cos/sin*(chunkHeight/chunkWidth), 1) : new(1, sin/cos* (chunkWidth / chunkHeight));
+            Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));
             if (sin < 0)
             {
                 step *= -1;
             }
-            Distance stepSize = (steppingY ? chunkHeight : chunkWidth)*step.Length();
+            Distance stepSize = (steppingY ? chunkHeight : chunkWidth) * step.Length();
 
-            Vector2 chunkCoords = new((origin.x-x)/chunkWidth, (origin.y-y)/chunkHeight);
+            Vector2 chunkCoords = new((origin.x - x) / chunkWidth, (origin.y - y) / chunkHeight);
 
-            // align chunk coords to the edge of a chunk
+            // align chunk coordinates to the edge of a chunk
             if (steppingY)
             {
                 chunkCoords.X += step.X * ((int)chunkCoords.Y - chunkCoords.Y);
@@ -181,14 +176,14 @@ namespace SaSimulator
             }
 
             int lastX = (int)chunkCoords.X, lastY = (int)chunkCoords.Y;
-            float stepsNeeded = length/stepSize;
+            float stepsNeeded = length / stepSize;
 
-            for(int i=0; i< stepsNeeded; i++)
+            for (int i = 0; i < stepsNeeded; i++)
             {
                 int x = (int)chunkCoords.X, y = (int)chunkCoords.Y;
 
                 // check the [x, lastY] chunk
-                if(steppingY && x != lastX && IsChunk(x,lastY))
+                if (steppingY && x != lastX && IsChunk(x, lastY))
                 {
                     foreach (var record in records[x, lastY])
                     {
@@ -224,7 +219,7 @@ namespace SaSimulator
                 }
                 // i had these 3 chunk checks extracted as a local function at first, replaced with
                 // foreach(var gameObject in CheckChunk(x,y)){yield return gameObject; }
-                // horever the extra layer of enumerators added a performance hit that was too significant to ignore,
+                // however the extra layer of enumerators added a performance hit that was too significant to ignore,
                 // so i felt the little bit of repetition was the lesser evil.
 
                 chunkCoords += step;

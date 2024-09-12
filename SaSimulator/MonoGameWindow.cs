@@ -88,7 +88,7 @@ namespace SaSimulator
 
             _spriteBatch.Begin();
 
-            // zoom and centre the camera
+            // zoom and center the camera
             float cameraClearance = 10;
             RectangleF bounds = game.GetBounds();
             bounds = new(bounds.Left - cameraClearance, bounds.Top - cameraClearance, bounds.Width + 2 * cameraClearance, bounds.Height + 2 * cameraClearance);

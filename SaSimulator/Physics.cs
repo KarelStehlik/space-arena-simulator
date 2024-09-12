@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading.Tasks.Dataflow;
-using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
