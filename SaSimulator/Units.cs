@@ -12,7 +12,6 @@ namespace SaSimulator
         {
             return Cells + " cells distance";
         }
-
         public static Distance operator +(Distance first, Distance other)
         {
             return new(first.Cells + other.Cells);
@@ -36,6 +35,10 @@ namespace SaSimulator
         public static Time operator /(Distance first, Speed other)
         {
             return new(first.Cells / other.CellsPerSecond);
+        }
+        public static float operator /(Distance first, Distance other)
+        {
+            return first.Cells / other.Cells;
         }
     }
 
@@ -68,6 +71,10 @@ namespace SaSimulator
         {
             return new(first.CellsPerSecond * other.Seconds);
         }
+        public static float operator /(Speed first, Speed other)
+        {
+            return first.CellsPerSecond / other.CellsPerSecond;
+        }
     }
 
     public readonly struct Time(float seconds)
@@ -94,6 +101,10 @@ namespace SaSimulator
         public static Time operator /(Time first, float other)
         {
             return new(first.Seconds / other);
+        }
+        public static float operator /(Time first, Time other)
+        {
+            return first.Seconds / other.Seconds;
         }
     }
 

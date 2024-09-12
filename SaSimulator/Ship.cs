@@ -140,6 +140,19 @@ namespace SaSimulator
             return best;
         }
 
+        public void ApplyModuleBuff(ModuleBuff buff)
+        {
+            foreach(Module module in modules)
+            {
+                module.AppyBuff(buff);
+            }
+        }
+
+        public Player ThisPlayer()
+        { 
+            return side == 0 ? game.player0 : game.player1;
+        }
+
         public List<Ship> GetEnemies()
         {
             return side == 0 ? game.player1.ships : game.player0.ships;
@@ -258,6 +271,38 @@ namespace SaSimulator
             }
         }
 
+        // damages all modules in cells whose centre lies in the AOE.
+        // [speculative game mechanic] This aoe is a square, which is evidently correct for reactor explosions, less clear for missiles.
+        // [speculative game mechanic] each module will only take damage from this once, even if multiple of its cells are affected.
+        public void TakeAoeDamage(Vector2 originWorldPos, Distance radius, float amount, DamageType type)
+        {
+            Vector2 relativePos = originWorldPos.RelativeTo(WorldPosition);
+            float middleCellX = relativePos.X + width / 2;
+            float middleCellY = relativePos.Y + height / 2;
+            int minX = (int)(middleCellX - radius.Cells - 0.4f);
+            int minY = (int)(middleCellY - radius.Cells - 0.4f);
+            int maxX = (int)(middleCellX + radius.Cells - 0.4f);
+            int maxY = (int)(middleCellY + radius.Cells - 0.4f);
+            minX = Math.Max(0, minX);
+            minY = Math.Max(0, minY);
+            maxX = Math.Min(maxX, cells.GetLength(0) - 1);
+            maxY = Math.Min(maxY, cells.GetLength(1) - 1);
+            List<Module> alreadyHit = [];
+
+            for (int x = minX; x <= maxX; x++)
+            {
+                for (int y = minY; y <= maxY; y++)
+                {
+                    Cell? cell = cells[x, y];
+                    if (cell != null && cell.module != null && !cell.module.IsDestroyed && !alreadyHit.Contains(cell.module))
+                    {
+                        alreadyHit.Add(cell.module);
+                        cell.module.TakeDamage(amount, type);
+                    }
+                }
+            }
+        }
+
         public readonly struct HitDetected(Cell cell, Distance traveled)
         {
             public readonly Cell cell = cell;
@@ -267,15 +312,8 @@ namespace SaSimulator
         // Enumerates modules in all cells hit by the given ray.
         public IEnumerable<HitDetected> RayIntersect(Transform rayOrigin, Distance rayLength)
         {
-            // if the ray is too far, do nothing
-            float maxDistance = (size + rayLength).Cells;
-            if (Vector2.DistanceSquared(rayOrigin.Position,WorldPosition.Position) > maxDistance * maxDistance)
-            {
-                yield break;
-            }
-
             // get the ray into the reference frame of this ship.
-            Transform ray = WorldPosition - rayOrigin;
+            Transform ray = rayOrigin.RelativeTo(WorldPosition);
 
             // the lowest-coordinate corner of this ship
             Vector2 lowestCorner = new(-width / 2f, -height / 2f);

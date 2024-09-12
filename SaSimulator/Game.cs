@@ -21,6 +21,18 @@ namespace SaSimulator
     internal class Player
     {
         public readonly List<Ship> ships = [];
+        public readonly List<ModuleBuff> buffs = [];
+
+        public void ApplyAllBuffs()
+        {
+            foreach(Ship ship in ships)
+            {
+                foreach (ModuleBuff buff in buffs)
+                {
+                    ship.ApplyModuleBuff(buff);
+                }
+            }
+        }
     }
 
     internal class Game(List<ShipInfo> player0, List<ShipInfo> player1, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
@@ -35,6 +47,7 @@ namespace SaSimulator
         public Time time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
+        public readonly UniformGrid collisionDetectionGrid = new(10);
         public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
                                                               // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
 
@@ -52,9 +65,11 @@ namespace SaSimulator
                 player1.ships.Add(ship);
                 gameObjects.Add(ship);
             }
+            player0.ApplyAllBuffs();
+            player1.ApplyAllBuffs();
         }
 
-        // Bounds of all ships in game. Does not include projectiles.
+        // Bounds of all ships in game.
         public RectangleF GetBounds()
         {
             IEnumerable<Ship> allShips = player0.ships.AsEnumerable().Concat(player1.ships);
@@ -62,10 +77,17 @@ namespace SaSimulator
             {
                 return new(1, 1, 1, 1);
             }
-            float minX = allShips.Select(go => (go.WorldPosition.x - go.size / 2).Cells).Min();
-            float maxX = allShips.Select(go => (go.WorldPosition.x + go.size / 2).Cells).Max();
-            float minY = allShips.Select(go => (go.WorldPosition.y - go.size / 2).Cells).Min();
-            float maxY = allShips.Select(go => (go.WorldPosition.y + go.size / 2).Cells).Max();
+            float minX = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float minY = float.PositiveInfinity;
+            float maxY = float.NegativeInfinity;
+            foreach(Ship ship in allShips)
+            {
+                minX = Math.Min(minX, (ship.WorldPosition.x - ship.size).Cells);
+                maxX = Math.Max(maxX, (ship.WorldPosition.x + ship.size).Cells);
+                minY = Math.Min(minY, (ship.WorldPosition.y - ship.size).Cells);
+                maxY = Math.Max(maxY, (ship.WorldPosition.y + ship.size).Cells);
+            }
             return new(minX, minY, maxX - minX, maxY - minY);
         }
 
@@ -107,6 +129,13 @@ namespace SaSimulator
             // add new ones
             gameObjects.AddRange(newGameObjects);
             newGameObjects.Clear();
+
+            // populate collision detection
+            collisionDetectionGrid.Reset(GetBounds());
+            foreach (GameObject obj in gameObjects)
+            {
+                collisionDetectionGrid.Add(obj);
+            }
 
             // game tick
             foreach (GameObject obj in gameObjects)

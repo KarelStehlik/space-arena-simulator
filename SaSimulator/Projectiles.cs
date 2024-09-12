@@ -64,21 +64,23 @@ namespace SaSimulator
 
         public override void Tick(Time dt)
         {
-            var targets = side == 0 ? game.player1.ships : game.player0.ships;
-            foreach (var target in targets)
+            foreach (GameObject potentialTarget in game.collisionDetectionGrid.Get(WorldPosition,(speed*dt)))
             {
-                foreach (HitDetected hit in target.RayIntersect(WorldPosition, speed * dt))
+                if (!potentialTarget.IsDestroyed && potentialTarget is Ship target && target.side != side)
                 {
-                    OnHit(target, hit);
-                    if (IsDestroyed)
+                    foreach (HitDetected hit in target.RayIntersect(WorldPosition, speed * dt))
                     {
-                        if (game.hasGraphics)
+                        OnHit(target, hit);
+                        if (IsDestroyed)
                         {
-                            Time travelTime = hit.traveled / speed;
-                            WorldPosition = new(WorldPosition.x + vx * travelTime, WorldPosition.y + vy * travelTime, WorldPosition.rotation);
-                            DrawTrail();
+                            if (game.hasGraphics)
+                            {
+                                Time travelTime = hit.traveled / speed;
+                                WorldPosition = new(WorldPosition.x + vx * travelTime, WorldPosition.y + vy * travelTime, WorldPosition.rotation);
+                                DrawTrail();
+                            }
+                            return;
                         }
-                        return;
                     }
                 }
             }
@@ -109,7 +111,9 @@ namespace SaSimulator
             {
                 return;
             }
-            if (hit.cell.module.IsDestroyed)
+            if (hit.cell.module.IsDestroyed) // when we hit a destroyed module, damage is transfered to the nearest non-destroyed module.
+                                             // [game mechanic] This indeed allows it to bypass shields protecting those modules, as shown here:
+                                             // https://youtube.com/shorts/hxgPU1mlzhA?feature=share
             {
                 Time travelTime = hit.traveled / speed;
                 target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).TakeDamage(damage, DamageType.Ballistics);
@@ -166,9 +170,11 @@ namespace SaSimulator
         }
     }
 
-    internal class Missile(Game game, Transform transform, Speed speed, Time duration, float damage, int side, Color color, Ship? target, float turningSpeed) :
+    internal class Missile(Game game, Transform transform, Speed speed, Time duration, float radius, float damage, int side, Color color, Ship? target, float turningSpeed) :
         Projectile(game, transform, speed, duration, damage, side, color)
     {
+        float radius = radius;
+
         public override void Tick(Time dt)
         {
             if (target!=null && !target.IsDestroyed)
@@ -214,7 +220,7 @@ namespace SaSimulator
                 Time travelTime = hit.traveled / speed;
                 explosionOrigin=target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).WorldPosition.Position;
             }
-            //target.TakeAoeDamage(explosionOrigin, this.damage, DamageType.Explosive);
+            target.TakeAoeDamage(explosionOrigin, radius.Cells(), damage, DamageType.Explosive);
             IsDestroyed = true;
         }
     }

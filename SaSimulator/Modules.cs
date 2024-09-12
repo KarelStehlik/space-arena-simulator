@@ -3,14 +3,13 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
     enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Power, Repairbay, Engine }
     enum StatType { Health, Damage, Armor, Reflect, Firerate, Mass, PowerUse, PowerGen, Range,
-        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius }
+        FiringArc, Thrust, TurnThrust, ShieldStrength, ShieldMaxRegen, ShieldRegenRate, ShieldRadius, ExplosionRadius }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
     {
@@ -57,10 +56,10 @@ namespace SaSimulator
                 {
                     Size = new(width, height)
                 };
-                outline = new("cell")
+                outline = new("borderless_cell")
                 {
                     Size = new(width + .3f, height + .3f),
-                    Color = ship.side == 0 ? Color.Lime : Color.Red
+                    Color = ship.side == 0 ? Color.Blue : Color.Red
                 };
             }
         }
@@ -328,7 +327,7 @@ namespace SaSimulator
             return ClampAngle((float)Math.Atan2(distance.Y, distance.X), (float)thisModule.WorldPosition.rotation, firingArc / 2) + spread * (float)(thisModule.game.rng.NextDouble() - .5);
         }
 
-        public void ApplyBuff(ModuleBuff buff)
+        public virtual void ApplyBuff(ModuleBuff buff)
         {
             switch (buff.stat)
             {
@@ -409,17 +408,27 @@ namespace SaSimulator
     }
 
     internal class MissileGun(float firerate, float maxAmmo, int burstFireThreshold,
-        Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread,
+        Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread, float radius,
         float damage, float guidanceStrength) :
         BurstGun(firerate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, damage)
     {
+        Attribute<float> radius = new(radius);
         public override ModuleTag[] Tags => [ModuleTag.Weapon, ModuleTag.Missile];
 
         public override void Fire(Module thisModule)
         {
             thisModule.game.AddObject(
                     new Missile(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
-                    speed, duration, damage, thisModule.ship.side, Color.LightGray, GetTarget(thisModule), guidanceStrength));
+                    speed, duration, radius, damage, thisModule.ship.side, Color.LightGray, GetTarget(thisModule), guidanceStrength));
+        }
+
+        public void ApplyBuff(ModuleBuff buff)
+        {
+            base.ApplyBuff(buff);
+            if (buff.stat == StatType.ExplosionRadius)
+            {
+                radius.Increase = buff.multiplier;
+            }
         }
     }
 
@@ -493,13 +502,13 @@ namespace SaSimulator
         public static Module SmallLaser(Ship ship)
         {
             Module gun = new(1, 1, "cell", 15, 0, 0, 0, 0, 0, 10, ship);
-            gun.AddComponent(new LaserGun(0.5f, 2.Seconds(), 500.Cells(), 360f.ToRadians(), 10));
+            gun.AddComponent(new LaserGun(0.5f, 2.Seconds(), 100.Cells(), 360f.ToRadians(), 10));
             return gun;
         }
         public static Module SmallMissile(Ship ship)
         {
             Module gun = new(1, 2, "cell", 30, 0, 0, 0, 0, 0, 10, ship);
-            gun.AddComponent(new MissileGun(3.33333f, 1, 1, 0.Seconds(), 100.Cells(), 50.CellsPerSecond(), 70f.ToRadians(), 90f.ToRadians(), 4, 2f)
+            gun.AddComponent(new MissileGun(3.33333f, 1, 1, 0.Seconds(), 100.Cells(), 50.CellsPerSecond(), 70f.ToRadians(), 90f.ToRadians(), 2, 4, 2f)
             {
                 duration = 3.Seconds()
             });
@@ -508,7 +517,7 @@ namespace SaSimulator
         public static Module SmallShield(Ship ship)
         {
             Module shield = new(1, 2, "cell", 30, 0, 0, 0, 0, 0, 10, ship);
-            shield.AddComponent(new Shield(20000, 7.Cells(), 10, 200));
+            shield.AddComponent(new Shield(20, 7.Cells(), 10, 200));
             return shield;
         }
     }

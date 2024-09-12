@@ -1,10 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
+using System.Threading.Tasks.Dataflow;
+using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
     internal static class Physics
     {
+        public static float Square(float x)
+        {
+            return x * x;
+        }
+
         // Angle between the 2 angles, normalized to 0-2PI
         private static float RelativeAngle(float firstAngle, float secondAngle)
         {
@@ -76,13 +84,24 @@ namespace SaSimulator
                 return new Transform(first.x + second.x * cos - second.y * sin, first.y + second.x * sin + second.y * cos, first.rotation + second.rotation);
             }
 
-            // assume [first] and [second] are world positions. Find a transform "x" such that [first] + "x" = [second] (give or take floating point inaccuracy)
-            public static Transform operator -(Transform first, Transform second)
+            // assume [this] and [other] are world positions. Find a transform "x" such that [other] + "x" = [this] (give or take floating point inaccuracy)
+            public Transform RelativeTo(Transform other)
             {
-                float cos = (float)Math.Cos(first.rotation), sin = (float)Math.Sin(first.rotation);
-                Distance dx = second.x - first.x, dy = second.y - first.y;
-                return new Transform(dx * cos + dy * sin, dx * (-sin) + dy * cos, second.rotation - first.rotation);
+                float cos = (float)Math.Cos(other.rotation), sin = (float)Math.Sin(other.rotation);
+                Distance dx = this.x - other.x, dy = this.y - other.y;
+                return new Transform(dx * cos + dy * sin, dx * (-sin) + dy * cos, this.rotation - other.rotation);
             }
+        }
+    }
+
+    internal static class PhysicsExtensions
+    {
+        // assume [first] and [other] are world positions. Find the position of [first] relative to [other]
+        public static Vector2 RelativeTo(this Vector2 first, Physics.Transform other)
+        {
+            float cos = (float)Math.Cos(other.rotation), sin = (float)Math.Sin(other.rotation);
+            float dx = first.X - other.x.Cells, dy = first.Y - other.y.Cells;
+            return new Vector2(dx * cos + dy * sin, dx * (-sin) + dy * cos);
         }
     }
 }

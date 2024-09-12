@@ -1,6 +1,8 @@
 ﻿using CommandLine;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace SaSimulator
 {
@@ -25,8 +27,8 @@ namespace SaSimulator
         static void RunMain(Options o)
         {
             var file = FileLoading.Read(o.File);
-            var a = file.player0;
-            var b = file.player1;
+            List<ShipInfo> a = file.player0;
+            List<ShipInfo> b = file.player1;
             Random rng = new();
 
             if (o.Graphics)
@@ -42,10 +44,10 @@ namespace SaSimulator
                     case Game.GameResult.unfinished:
                         break;
                     case Game.GameResult.win_0:
-                        Console.WriteLine("player 0 wins");
+                        Console.WriteLine("blue player wins");
                         break;
                     case Game.GameResult.win_1:
-                        Console.WriteLine("player 1 wins");
+                        Console.WriteLine("red player wins");
                         break;
                     case Game.GameResult.draw:
                         Console.WriteLine("draw");
@@ -56,34 +58,67 @@ namespace SaSimulator
 
             for (int t = 0; t < 100; t++)
             {
-                int win0 = 0, win1 = 0, draw = 0;
                 Console.WriteLine("simulating...");
                 Stopwatch stopwatch = Stopwatch.StartNew();
+                SimulationResults results = new(o.NumberSims);
+
                 for (int i = 0; i < o.NumberSims; i++)
                 {
-                    Game game = new(a, b, o.Graphics, (o.Timeout == 0 ? float.PositiveInfinity : o.Timeout).Seconds(), rng.Next(), o.Deltatime.Seconds());
-                    game.Load();
-                    while (game.result == Game.GameResult.unfinished)
-                    {
-                        game.Tick();
-                    }
-                    switch (game.result)
-                    {
-                        case Game.GameResult.win_0:
-                            win0++;
-                            break;
-                        case Game.GameResult.win_1:
-                            win1++;
-                            break;
-                        case Game.GameResult.draw:
-                            draw++;
-                            break;
-                    }
+                    ThreadPool.QueueUserWorkItem(Simulate, new SimulationInfo(a,b,o,rng.Next(), results));
                 }
-                Console.WriteLine($"Player 0 has {win0} wins, {draw} draws, {win1} losses.");
-                Console.WriteLine($"Winrate {win0 / (float)(win0 + win1) * 100:0.00}%");
+                results.done.WaitOne();
+
+                Console.WriteLine($"Blue player (p0) has {results.win0} wins, {results.draw} draws, {results.win1} losses.");
+                Console.WriteLine($"Winrate {results.win0 / (float)(results.win0 + results.win1) * 100:0.00}%");
                 stopwatch.Stop();
                 Console.WriteLine($"elapsed: {stopwatch.ElapsedMilliseconds} ms");
+            }
+        }
+
+        class SimulationResults(int count)
+        {
+            public int win0 = 0, win1 = 0, draw = 0;
+            public int remaining = count;
+            public readonly AutoResetEvent done = new(false);
+        }
+
+        class SimulationInfo(List<ShipInfo> a, List<ShipInfo> b, Options o, int randomSeed, SimulationResults results)
+        {
+            public readonly List<ShipInfo> shipsA=a, shipsB=b;
+            public readonly Options options=o;
+            public readonly int randomSeed = randomSeed;
+            public readonly SimulationResults results = results;
+        }
+
+        static void Simulate(object? simulationInfo)
+        {
+            if(simulationInfo==null || simulationInfo is not SimulationInfo info)
+            {
+                return;
+            }
+            Game game = new(info.shipsA, info.shipsB, info.options.Graphics,
+                (info.options.Timeout == 0 ? float.PositiveInfinity : info.options.Timeout).Seconds(),
+                info.randomSeed, info.options.Deltatime.Seconds());
+            game.Load();
+            while (game.result == Game.GameResult.unfinished)
+            {
+                game.Tick();
+            }
+            switch (game.result)
+            {
+                case Game.GameResult.win_0:
+                    System.Threading.Interlocked.Increment(ref info.results.win0);
+                    break;
+                case Game.GameResult.win_1:
+                    System.Threading.Interlocked.Increment(ref info.results.win1);
+                    break;
+                case Game.GameResult.draw:
+                    System.Threading.Interlocked.Increment(ref info.results.draw);
+                    break;
+            }
+            if(System.Threading.Interlocked.Decrement(ref info.results.remaining) == 0)
+            {
+                info.results.done.Set();
             }
         }
 
