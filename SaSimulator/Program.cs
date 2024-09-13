@@ -1,6 +1,5 @@
 ﻿using CommandLine;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
@@ -82,7 +81,7 @@ namespace SaSimulator
 
         class SimulationInfo(ShipLists ships, Options o, int randomSeed, SimulationResults results)
         {
-            public readonly ShipLists ships=ships;
+            public readonly ShipLists ships = ships;
             public readonly Options options = o;
             public readonly int randomSeed = randomSeed;
             public readonly SimulationResults results = results;

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
-using System.Security.Principal;
 using static SaSimulator.Physics;
 using static SaSimulator.Ship;
 
@@ -87,7 +86,8 @@ namespace SaSimulator
                             return;
                         }
                     }
-                }else if(potentialTarget is JunkPiece junk)
+                }
+                else if (potentialTarget is JunkPiece junk)
                 {
                     OnHit(junk);
                     if (IsDestroyed)
@@ -122,7 +122,7 @@ namespace SaSimulator
 
         protected virtual void OnHit(Ship target, HitDetected hit)
         {
-            foreach (Shield shield in hit.cell.coveringShields)
+            foreach (Modules.Shield shield in hit.cell.coveringShields)
             {
                 if (shield.IsActive())
                 {
@@ -208,7 +208,7 @@ namespace SaSimulator
 
         public override void Tick(Time dt)
         {
-            if(IsDestroyed) return; // this was shot down by point defense
+            if (IsDestroyed) return; // this was shot down by point defense
             if (target != null && !target.IsDestroyed)
             {
                 // rotate towards target
@@ -232,7 +232,7 @@ namespace SaSimulator
 
         protected override void OnHit(Ship target, HitDetected hit)
         {
-            foreach (Shield shield in hit.cell.coveringShields)
+            foreach (Modules.Shield shield in hit.cell.coveringShields)
             {
                 if (shield.IsActive())
                 {
@@ -251,7 +251,7 @@ namespace SaSimulator
             {
                 Time travelTime = hit.traveled / speed;
                 Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells));
-                if(transferTo != null)
+                if (transferTo != null)
                 {
                     explosionOrigin = transferTo.WorldPosition.Position;
                 }
@@ -262,7 +262,7 @@ namespace SaSimulator
 
         public override UniformGrid? BelongsToGrid()
         {
-            return side==0? game.missilesP0 : game.missilesP1;
+            return side == 0 ? game.missilesP0 : game.missilesP1;
         }
     }
 
@@ -317,24 +317,26 @@ namespace SaSimulator
             IsDestroyed |= health < 0;
         }
 
-        public override void Tick(Time dt) {
+        public override void Tick(Time dt)
+        {
             float damping = (float)Math.Pow(SPEED_DAMPING, dt.Seconds);
             vx *= damping;
             vy *= damping;
             duration -= dt;
-            WorldPosition = new(WorldPosition.x+vx*dt, WorldPosition.y+vy*dt,WorldPosition.rotation);
+            WorldPosition = new(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation);
             IsDestroyed |= duration.Seconds < 0;
         }
 
-        public override void Draw(SpriteBatch batch) {
-            Sprite sprite = new("junk") { Size = new(SIZE.Cells*2, SIZE.Cells*2) };
+        public override void Draw(SpriteBatch batch)
+        {
+            Sprite sprite = new("junk") { Size = new(SIZE.Cells * 2, SIZE.Cells * 2) };
             sprite.SetTransform(WorldPosition);
             sprite.Draw(batch);
         }
 
         public override UniformGrid? BelongsToGrid()
         {
-            return side==0? game.hittableP0 : game.hittableP1;
+            return side == 0 ? game.hittableP0 : game.hittableP1;
         }
     }
 }

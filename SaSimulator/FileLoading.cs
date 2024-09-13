@@ -46,7 +46,7 @@ namespace SaSimulator
                 var ships = Players[i].Split("--- new ship ---", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
                 string[] playerArgs = ships[0].Split('\n'); // player specific modifiers, such as ship bonus
-                ReadModuleBuffsInto(playerArgs, i==1? result.player0Buffs : result.player1Buffs);
+                ReadModuleBuffsInto(playerArgs, i == 1 ? result.player0Buffs : result.player1Buffs);
 
                 for (int s = 1; s < ships.Length; s++)   // process the ship
                 {

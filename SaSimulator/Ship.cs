@@ -3,7 +3,6 @@
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -33,7 +32,7 @@ namespace SaSimulator
         public class Cell(Module? module)
         {
             public readonly Module? module = module;
-            public readonly List<Shield> coveringShields = [];
+            public readonly List<Modules.Shield> coveringShields = [];
         }
 
         private readonly float MOVEMENT_DAMPENING = 0.75f;
@@ -41,16 +40,16 @@ namespace SaSimulator
 
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
                                         // Each module is stored here once for every cell it covers
-        private readonly List<Module> modules = []; // stores each module once
+        public readonly List<Module> modules = []; // stores each module once
         private readonly int cellCount = 0; // # of cells occupied by modules
         private readonly int initialModuleNumber;
-        public int modulesAlive=0;
+        public int modulesAlive = 0;
         private readonly int width = 0, height = 0; // in cells
         public readonly int side;
         private Speed baseAcceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
         private float baseTurnAcceleration, turningVelocity = 0;
 
-        public float turnPower=0, thrust=0, mass=1, energy=0, energyUse=0, warpForce=0; // these are recalculated every tick
+        public float turnPower = 0, thrust = 0, mass = 1, energy = 0, energyUse = 0, warpForce = 0; // these are recalculated every tick
 
         private float energyPhase = 0, warpProgress = 0;
         private Time energyCycleDuration = 5.Seconds();
@@ -69,7 +68,7 @@ namespace SaSimulator
             foreach (ModulePlacement placement in info.modules)
             {
                 // create the requested module
-                MethodInfo method = typeof(Modules).GetMethod(placement.module) ?? throw new ArgumentException($"No such module: {placement.module}");
+                MethodInfo method = typeof(ModuleCreation).GetMethod(placement.module) ?? throw new ArgumentException($"No such module: {placement.module}");
                 Module module = method.Invoke(null, [this]) as Module ?? throw new ArgumentException($"Unable to create module: {placement.module}");
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
@@ -82,11 +81,11 @@ namespace SaSimulator
 
                 foreach (ModuleComponent component in module.components)
                 {
-                    if (component is Shield shield)
+                    if (component is Modules.Shield shield)
                     {
                         maxShieldRadius = Math.Max(maxShieldRadius, (int)shield.Radius.Cells);
                     }
-                    if(component is Gun gun)
+                    if (component is Modules.Gun gun)
                     {
                         maxWeaponRange = Math.Max(maxWeaponRange.Cells, gun.Range.Cells).Cells();
                     }
@@ -128,7 +127,7 @@ namespace SaSimulator
                 module.Initialize();
                 foreach (ModuleComponent component in module.components)
                 {
-                    if (component is Shield shield)
+                    if (component is Modules.Shield shield)
                     {
                         AddShield(shield, module, shield.Radius);
                     }
@@ -198,6 +197,31 @@ namespace SaSimulator
         // How exactly this works is still mysterious.
         private void Accelerate(Time dt)
         {
+            Ship enemyMain = GetEnemies()[0];
+
+            // [speculative game mechanic] I believe that a ship's mobility involves the thrust from engines, which is affected by mass, and the base movement speed which is not.
+            // common builds using armor have such mass that the base speed is already dominant, so changes in thrust or mass don't make much of a difference.
+            // there was once an anomaly with 700% increased mass which seemed to affect nothing, it could have been a bug but i believe it was really just due to this.
+            float turnAmount = (baseTurnAcceleration + turnPower / mass) * dt.Seconds;
+            Speed acceleration = (baseAcceleration + thrust.CellsPerSecond() / mass) * dt.Seconds;
+            if (thrust == 0 && turnPower == 0)
+            {
+                acceleration *= 0.2f;
+                turnAmount *= 0.2f;
+            }
+
+            // turning
+            float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
+            if (IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
+            {
+                turningVelocity += turnAmount;
+            }
+            else
+            {
+                turningVelocity -= turnAmount;
+            }
+
+            // thrust
             float accelAngle = WorldPosition.rotation;
             switch (currentAction)
             {
@@ -206,19 +230,22 @@ namespace SaSimulator
                 case MovementAction.Retreat:
                     accelAngle += (float)Math.PI; break;
                 case MovementAction.CircleLeft:
-                    accelAngle -= (float)Math.PI/2; break;
+                    accelAngle -= (float)Math.PI / 2; break;
                 case MovementAction.CircleRight:
-                    accelAngle += (float)Math.PI/2; break;
+                    accelAngle += (float)Math.PI / 2; break;
             }
-            Speed acceleration = baseAcceleration + thrust.CellsPerSecond() / mass;
-            vx += acceleration * (float)Math.Cos(accelAngle) * dt.Seconds;
-            vy += acceleration * (float)Math.Sin(accelAngle) * dt.Seconds;
+            if (thrust == 0 && turnPower == 0)
+            {
+                acceleration *= 0.2f;
+            }
+            vx += acceleration * (float)Math.Cos(accelAngle);
+            vy += acceleration * (float)Math.Sin(accelAngle);
             movementActionRemainingDuration -= dt;
             if (movementActionRemainingDuration.Seconds <= 0)
             {
                 movementActionRemainingDuration = movementActionMaxDuration;
                 currentAction = possibleMoveActions[game.rng.Next(possibleMoveActions.Length)];
-                float distanceToEnemyMain = Vector2.Distance(GetEnemies()[0].WorldPosition.Position, WorldPosition.Position);
+                float distanceToEnemyMain = Vector2.Distance(enemyMain.WorldPosition.Position, WorldPosition.Position);
                 if (currentAction == MovementAction.Retreat && distanceToEnemyMain > maxWeaponRange.Cells * 0.8f ||
                     distanceToEnemyMain > maxWeaponRange.Cells * 1.2f)
                 {
@@ -235,8 +262,6 @@ namespace SaSimulator
             vx *= moveDamping;
             vy *= moveDamping;
             WorldPosition = new Transform(WorldPosition.x + vx * dt, WorldPosition.y + vy * dt, WorldPosition.rotation + turningVelocity * dt.Seconds);
-
-            modules.RemoveAll(m => m.IsDestroyed);
 
             if (IsCriticallyDamaged())
             {
@@ -267,23 +292,8 @@ namespace SaSimulator
                 }
             }
 
-            Ship enemyMain = GetEnemies()[0];
-
             // do movement
-            {
-                // determine whether the enemy is to the left of this ship
-                float leftSide = (float)(WorldPosition.rotation + Math.PI / 2);
-                if (IsPointInCone(enemyMain.WorldPosition.Position, WorldPosition.Position, leftSide, (float)Math.PI))
-                {
-                    turningVelocity += (baseTurnAcceleration+turnPower/mass) * dt.Seconds;
-                }
-                else
-                {
-                    turningVelocity -= (baseTurnAcceleration + turnPower / mass) * dt.Seconds;
-                }
-
-                Accelerate(dt);
-            }
+            Accelerate(dt);
         }
 
         public override void Draw(SpriteBatch batch)
@@ -298,7 +308,7 @@ namespace SaSimulator
             }
             if (!IsPowered())
             {
-                Sprite sprite = new("power") { Size = new(size.Cells,size.Cells) };
+                Sprite sprite = new("power") { Size = new(size.Cells * 0.7f, size.Cells * 0.7f) };
                 sprite.SetTransform(WorldPosition);
                 sprite.Draw(batch);
             }
@@ -306,12 +316,12 @@ namespace SaSimulator
 
         public override UniformGrid? BelongsToGrid()
         {
-            return side==0? game.hittableP0 : game.hittableP1;
+            return side == 0 ? game.hittableP0 : game.hittableP1;
         }
 
         // removes a shield completely from covering any cells. This is very slow, and should basically never be called.
         // Instead, we will simply ignore depleted shields when processing hits.
-        public void RemoveShield(Shield shield)
+        public void RemoveShield(Modules.Shield shield)
         {
             for (int x = 0; x < cells.GetLength(0); x++)
             {
@@ -331,7 +341,7 @@ namespace SaSimulator
         // (as we would need to reallocate everything and change a bunch of the ship's properties),
         // so a shield added this way which reaches past the ship will not have collisions beyond the ship's current borders.
         // There is no way in space arena to add shields or increase their size after ship creation, so this shouldn't be an issue.
-        public void AddShield(Shield shield, Module source, Distance radius)
+        public void AddShield(Modules.Shield shield, Module source, Distance radius)
         {
             float middleCellX = source.relativePosition.x.Cells + width / 2;
             float middleCellY = source.relativePosition.y.Cells + height / 2;
