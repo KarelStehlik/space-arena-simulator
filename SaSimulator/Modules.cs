@@ -9,11 +9,11 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
-    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Energy, RepairBay, Engine, Junk, PointDefense }
+    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Energy, RepairBay, Engine, Junk, PointDefense, Reactor }
     enum StatType
     {
         Health, Damage, Armor, Reflect, Firerate, Mass, EnergyUse, EnergyGen, Range, WarpForce, RepairRate, MaxRepair,
-        FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, Radius, ExplosionRadius, JunkHealth
+        FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, Radius, ExplosionRadius, JunkHealth, ThrustMultiplier, TurnMultiplier
     }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
@@ -253,6 +253,26 @@ namespace SaSimulator
 
     internal class Modules
     {
+        public class Armor() : ModuleComponent
+        {
+            public override ModuleTag[] Tags() => [ModuleTag.Armor];
+        }
+
+        public class Reactor() : ModuleComponent
+        {
+            public override ModuleTag[] Tags() => [ModuleTag.Reactor];
+        }
+
+        public class DeathExplode(float radius, float damage) : ModuleComponent
+        {
+            private readonly float radius=radius, damage=damage;
+            public override void OnDestroyed(Module thisModule)
+            {
+                thisModule.ship.TakeAoeDamage(thisModule.WorldPosition.Position, radius.Cells()*1.05f, damage, DamageType.Explosive);
+                // we slightly increase the radius to prevent rounding errors
+            }
+        }
+
         public class Engine(float thrust, float turning, float warp) : ModuleComponent
         {
             Attribute<float> thrust = new(thrust), turning = new(turning), warp = new(warp);
@@ -280,6 +300,46 @@ namespace SaSimulator
                 thisModule.ship.warpForce += warp;
                 thisModule.ship.turnPower += turning;
                 thisModule.ship.thrust += thrust;
+            }
+        }
+
+        // [speculative game mechanic] Afterburners are complete black magic in Space Arena.
+        // in this simulator, each afterburner had a random 5-10 second cooldown
+        public class Afterburner(float thrust, float turning, Time duration) : ModuleComponent
+        {
+            Attribute<float> thrust = new(thrust), turning = new(turning);
+            Attribute<Time> duration = new(duration);
+            Time currentPhaseRemainingDuration = 0.Seconds();
+            bool active = true;
+
+            public override ModuleTag[] Tags() => [ModuleTag.Engine];
+
+            public override void ApplyBuff(ModuleBuff buff, Module thisModule)
+            {
+                switch (buff.stat)
+                {
+                    case StatType.ThrustMultiplier:
+                        thrust.Increase += buff.multiplier;
+                        break;
+                    case StatType.TurnMultiplier:
+                        turning.Increase += buff.multiplier;
+                        break;
+                }
+            }
+
+            public override void Tick(Time dt, Module thisModule)
+            {
+                currentPhaseRemainingDuration -= dt;
+                if (currentPhaseRemainingDuration.Seconds < 0)
+                {
+                    active = !active;
+                    currentPhaseRemainingDuration = active ? duration : 5.Seconds() * (1 + (float)thisModule.game.rng.NextDouble());
+                }
+                if (active)
+                {
+                    thisModule.ship.afterburnerTurnPower += turning - 1;
+                    thisModule.ship.afterburnerThrust += thrust - 1;
+                }
             }
         }
 
@@ -416,8 +476,8 @@ namespace SaSimulator
         {
             protected Attribute<Distance> range = new(range);
             public Distance Range { get { return range; } }
-            protected float spread = spread;
-            Attribute<float> firingArc = new(firingArc);
+            protected float spread = spread.ToRadians();
+            Attribute<float> firingArc = new(firingArc.ToRadians());
             protected Attribute<float> damage = new(damage);
             protected Attribute<float> fireRate = new(fireRate);
             private Ship? target;
@@ -539,7 +599,7 @@ namespace SaSimulator
             BurstGun(fireRate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, damage)
         {
             Time dur = duration;
-            Attribute<float> radius = new(radius);
+            protected Attribute<float> radius = new(radius);
             public override ModuleTag[] Tags() => [ModuleTag.Weapon, ModuleTag.Missile];
 
             public override void Init(Module thisModule)
@@ -561,6 +621,32 @@ namespace SaSimulator
                 {
                     radius.Increase += buff.multiplier;
                 }
+            }
+        }
+
+        public class TorpedoGun(float fireRate, float maxAmmo, int burstFireThreshold,
+            Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread, float radius,
+            float damage, Time duration) :
+            MissileGun(fireRate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, radius, damage, 0, duration)
+        {
+            public override void Fire(Module thisModule)
+            {
+                thisModule.game.AddObject(
+                        new Torpedo(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
+                        speed, duration, radius, damage, thisModule.ship.side, Color.LightGray));
+            }
+        }
+
+        public class MineGun(float fireRate, float maxAmmo, int burstFireThreshold,
+            Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread, float radius,
+            float damage, Time duration) :
+            MissileGun(fireRate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, radius, damage, 0, duration)
+        {
+            public override void Fire(Module thisModule)
+            {
+                thisModule.game.AddObject(
+                        new Mine(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
+                        speed, duration, radius, damage, thisModule.ship.side, Color.LightGray));
             }
         }
 
@@ -616,10 +702,11 @@ namespace SaSimulator
         }
 
         public class JunkLauncher(float fireRate, float maxAmmo, int burstFireThreshold,
-            Time burstFireInterval, Distance range, Speed bulletSpeed, float health) :
+            Time burstFireInterval, Distance range, Speed bulletSpeed, float JunkHealth, Time duration) :
             BurstGun(fireRate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, 2 * (float)Math.PI, 2 * (float)Math.PI, 0)
         {
-            Attribute<float> junkHealth = new(health);
+            Attribute<float> health = new(JunkHealth);
+            new Attribute<Time> duration = new(duration);
 
             public override ModuleTag[] Tags() => [ModuleTag.Junk];
 
@@ -633,7 +720,7 @@ namespace SaSimulator
                 base.ApplyBuff(buff, thisModule);
                 if (buff.stat == StatType.JunkHealth)
                 {
-                    junkHealth.Increase += buff.multiplier;
+                    health.Increase += buff.multiplier;
                 }
             }
         }

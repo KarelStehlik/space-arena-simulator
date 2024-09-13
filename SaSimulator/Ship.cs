@@ -35,8 +35,9 @@ namespace SaSimulator
             public readonly List<Modules.Shield> coveringShields = [];
         }
 
-        private readonly float MOVEMENT_DAMPENING = 0.75f;
-        private readonly float ROTATION_DAMPENING = 0.1f;
+        private static readonly float MOVEMENT_DAMPENING = 0.75f;
+        private static readonly float ROTATION_DAMPENING = 0.1f;
+        private static readonly Time MIN_WARP_TIME = 5.Seconds(); // [speculative game mechanics] The time between warps is [this constant] + [cell count] / [sum of warp force]
 
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
                                         // Each module is stored here once for every cell it covers
@@ -48,8 +49,9 @@ namespace SaSimulator
         public readonly int side;
         private Speed baseAcceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
         private float baseTurnAcceleration, turningVelocity = 0;
+        public float mass = 1;
 
-        public float turnPower = 0, thrust = 0, mass = 1, energy = 0, energyUse = 0, warpForce = 0; // these are recalculated every tick
+        public float turnPower = 0, thrust = 0, energy = 0, energyUse = 0, warpForce = 0, afterburnerThrust=1, afterburnerTurnPower=1; // these are recalculated every tick
 
         private float energyPhase = 0, warpProgress = 0;
         private Time energyCycleDuration = 5.Seconds();
@@ -202,8 +204,8 @@ namespace SaSimulator
             // [speculative game mechanic] I believe that a ship's mobility involves the thrust from engines, which is affected by mass, and the base movement speed which is not.
             // common builds using armor have such mass that the base speed is already dominant, so changes in thrust or mass don't make much of a difference.
             // there was once an anomaly with 700% increased mass which seemed to affect nothing, it could have been a bug but i believe it was really just due to this.
-            float turnAmount = (baseTurnAcceleration + turnPower / mass) * dt.Seconds;
-            Speed acceleration = (baseAcceleration + thrust.CellsPerSecond() / mass) * dt.Seconds;
+            float turnAmount = (baseTurnAcceleration + turnPower / mass) * dt.Seconds * afterburnerTurnPower;
+            Speed acceleration = (baseAcceleration + thrust.CellsPerSecond() / mass) * dt.Seconds * afterburnerThrust;
             if (thrust == 0 && turnPower == 0)
             {
                 acceleration *= 0.2f;
@@ -254,6 +256,17 @@ namespace SaSimulator
             }
         }
 
+        private void Warp()
+        {
+            vx = 0.CellsPerSecond();
+            vy = 0.CellsPerSecond();
+            Ship enemyMain = GetEnemies()[0];
+            WorldPosition = enemyMain.WorldPosition;
+            WorldPosition += new Transform(0.Cells(), 0.Cells(), (float)(game.rng.NextDouble() - 0.5f) * 3);
+            float warpDistance = Math.Min(maxWeaponRange.Cells * (float)-game.rng.NextDouble(), -size.Cells - enemyMain.size.Cells);
+            WorldPosition += new Transform(warpDistance.Cells(), 0.Cells(), 0);
+        }
+
         public override void Tick(Time dt)
         {
             // passive actions
@@ -276,7 +289,7 @@ namespace SaSimulator
                 return;
             }
 
-            turnPower = 0; thrust = 0; mass = 1; energy = 0; energyUse = 0; warpForce = 0;
+            turnPower = 0; thrust = 0; energy = 0; energyUse = 0; warpForce = 0; afterburnerThrust = 1; afterburnerTurnPower = 1;
 
             foreach (Module module in modules)
             {
@@ -299,8 +312,19 @@ namespace SaSimulator
                 }
             }
 
+
             // do movement
             Accelerate(dt);
+
+            if (warpForce > 0)
+            {
+                warpProgress += dt / (MIN_WARP_TIME + (cellCount / warpForce).Seconds());
+                if (warpProgress >= 1)
+                {
+                    warpProgress = 0;
+                    Warp();
+                }
+            }
         }
 
         public override void Draw(SpriteBatch batch)
@@ -383,8 +407,8 @@ namespace SaSimulator
         public void TakeAoeDamage(Vector2 originWorldPos, Distance radius, float amount, DamageType type)
         {
             Vector2 relativePos = originWorldPos.RelativeTo(WorldPosition);
-            float middleCellX = relativePos.X + width / 2;
-            float middleCellY = relativePos.Y + height / 2;
+            float middleCellX = relativePos.X + width / 2f;
+            float middleCellY = relativePos.Y + height / 2f;
             int minX = (int)(middleCellX - radius.Cells - 0.4f);
             int minY = (int)(middleCellY - radius.Cells - 0.4f);
             int maxX = (int)(middleCellX + radius.Cells - 0.4f);

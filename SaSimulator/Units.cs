@@ -42,7 +42,7 @@ namespace SaSimulator
         }
     }
 
-    public readonly struct Speed(float value)
+    public readonly struct Speed(float value) : IMultiplyOperators<Speed, float, Speed>
     {
         public readonly float CellsPerSecond = value;
 
@@ -77,7 +77,7 @@ namespace SaSimulator
         }
     }
 
-    public readonly struct Time(float seconds)
+    public readonly struct Time(float seconds) : IMultiplyOperators<Time, float, Time>
     {
         public readonly float Seconds = seconds;
 
