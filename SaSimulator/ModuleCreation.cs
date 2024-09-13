@@ -62,18 +62,67 @@ namespace SaSimulator
             return processedParams;
         }
 
-        public static Module CreateModule(Dictionary<string, float> parameters, Ship ship)
+        private static Module CreateModule(Dictionary<string, float> parameters, Ship ship)
         {
             Type type = typeof(Module);
             return Activator.CreateInstance(type, ParseArguments(type, parameters, ship)) as Module ?? throw new Exception($"Unable to create base module for unknown reason");
         }
 
-        public static ModuleComponent CreateComponent(string name, Dictionary<string, float> parameters, Ship ship)
+        private static ModuleComponent CreateComponent(string name, Dictionary<string, float> parameters, Ship ship)
         {
             Type type = name=="Module"? typeof(Module) : typeof(Modules).GetNestedType(name) ?? throw new ArgumentException($"No such module component: {name}");
             return Activator.CreateInstance(type, ParseArguments(type, parameters, ship)) as ModuleComponent ?? throw new Exception($"Unable to create module component \"{name}\" for unknown reason");
         }
 
+        private static Module CreateFullModule(ModuleInfo info, Ship ship)
+        {
+            Module m = CreateModule(info.stats, ship);
+            foreach(ComponentInfo ci in info.components)
+            {
+                m.AddComponent(CreateComponent(ci.componentName, ci.parameters, ship));
+            }
+            m.AddComponent(new Modules.ModuleBonus(info.name, info.bonus));
+            return m;
+        }
+
+        public static Module Create(string name, Ship ship)
+        {
+            try
+            {
+                return CreateFullModule(ship.ThisPlayer().possibleModules[name], ship);
+            }catch (KeyNotFoundException)
+            {
+                Console.WriteLine($"no such module: {name}");
+                throw;
+            }
+        }
+
+        public class ComponentInfo()
+        {
+            public string componentName = "";
+            public Dictionary<string, float> parameters = [];
+        }
+
+        public class ModuleInfo()
+        {
+            public string name="";
+            public ModuleBuff bonus=new(0,StatType.Health,ModuleTag.Any);
+            public Dictionary<string, float> stats = [];
+            public readonly List<ComponentInfo> components = [];
+        }
+
+        public static Module Debug(Ship ship)
+        {
+            Module m = new(1, 1, 100, 3, 0, .55f, 0, 0, 10, ship);
+            m.AddComponent(new Modules.Debug());
+            return m;
+        }
+        public static Module Bonus(Ship ship)
+        {
+            Module m = new(1, 1, 10, 3, 0, .55f, 0, 10, 10, ship);
+            m.AddComponent(new Modules.ModuleBonus("bonus", new(2, StatType.Health, ModuleTag.Any)));
+            return m;
+        }
         public static Module SmallSteelArmor(Ship ship)
         {
             return new(1, 1, 145, 3, 0, .55f, 0, 0, 10, ship);
@@ -124,10 +173,7 @@ namespace SaSimulator
         public static Module SmallMissile(Ship ship)
         {
             Module gun = new(1, 2, 30, 0, 0, 0, 0, 0, 10, ship);
-            gun.AddComponent(new Modules.MissileGun(3.33333f, 1, 1, 0.Seconds(), 100.Cells(), 50.CellsPerSecond(), 70f.ToRadians(), 90f.ToRadians(), 2, 4, 2f)
-            {
-                duration = 3.Seconds()
-            });
+            gun.AddComponent(new Modules.MissileGun(3.33333f, 1, 1, 0.Seconds(), 100.Cells(), 50.CellsPerSecond(), 70f.ToRadians(), 90f.ToRadians(), 2, 4, 2f,3.Seconds()));
             return gun;
         }
         public static Module SmallShield(Ship ship)

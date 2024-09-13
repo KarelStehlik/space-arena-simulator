@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Drawing;
 using System.Linq;
 using static SaSimulator.Physics;
@@ -19,10 +20,46 @@ namespace SaSimulator
         public virtual UniformGrid? BelongsToGrid() { return null; }
     }
 
-    internal class Player(List<ModuleBuff> buffs)
+    internal class Player(List<ModuleBuff> buffs, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> possibleModules)
     {
+        public readonly IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> possibleModules=possibleModules;
+
         public readonly List<Ship> ships = [];
         public readonly List<ModuleBuff> buffs = buffs;
+
+        // Module bonuses: Having at least 1 of a particular type of module in your fleet grants a buff to all ships in the fleet.
+        // this buff is specific to that module type, IE. Chaingun has a different bonus than Missile Launcher.
+        // This buff vanishes when all modules of that type have been destroyed.
+        private class ModuleBonus(ModuleBuff buff)
+        {
+            public readonly ModuleBuff buff=buff;
+            public int grantedBy = 1;
+        }
+        private Dictionary<string, ModuleBonus> uniqueModuleBonuses=new();
+        public void AddModuleBonus(string name, ModuleBuff buff)
+        {
+            if (uniqueModuleBonuses.ContainsKey(name))
+            {
+                uniqueModuleBonuses[name].grantedBy++;
+            }
+            else
+            {
+                uniqueModuleBonuses[name] = new(buff);
+            }
+        }
+        public void RemoveModuleBonus(string name)
+        {
+            ModuleBonus bonus = uniqueModuleBonuses[name];
+            Console.WriteLine(bonus.grantedBy);
+            if (--bonus.grantedBy == 0)
+            {
+                foreach (Ship ship in ships)
+                {
+                    ship.ApplyModuleBuff(bonus.buff * -1);
+                }
+                uniqueModuleBonuses.Remove(name);
+            }
+        }
 
         public void ApplyAllBuffs()
         {
@@ -32,17 +69,21 @@ namespace SaSimulator
                 {
                     ship.ApplyModuleBuff(buff);
                 }
+                foreach(ModuleBonus bonus in uniqueModuleBonuses.Values)
+                {
+                    ship.ApplyModuleBuff(bonus.buff);
+                }
             }
         }
     }
 
-    internal class Game(ShipLists ships, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
+    internal class Game(ShipLists ships, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p0Modules, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p1Modules, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
     {
         public readonly Time deltaTime = deltatime;
         public readonly bool hasGraphics = hasGraphics;
         public enum GameResult { win_0, win_1, draw, unfinished };
         public GameResult Result { get; private set; } = GameResult.unfinished;
-        public readonly Player player0 = new(new(ships.player0Buffs)), player1 = new(new(ships.player1Buffs));
+        public readonly Player player0 = new(new(ships.player0Buffs), p0Modules), player1 = new(new(ships.player1Buffs), p1Modules);
         private readonly List<GameObject> gameObjects = [], newGameObjects = [];
         private readonly List<ShipInfo> player0ShipList = ships.player0, player1ShipList = ships.player1;
         public Time Time { get; private set; } = 0.Seconds();

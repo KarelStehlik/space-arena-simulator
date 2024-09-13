@@ -21,6 +21,11 @@ namespace SaSimulator
         public readonly StatType stat = stat;
         public float multiplier = multiplier;
         public readonly ModuleTag targetModule = targetModule;
+
+        public static ModuleBuff operator *(ModuleBuff first, float other)
+        {
+            return new(other * first.multiplier, first.stat, first.targetModule);
+        }
     }
 
     enum DamageType { Ballistics, Explosive, Laser };
@@ -28,7 +33,7 @@ namespace SaSimulator
     // A ship is made of rectangular modules arranged on a square grid.
     internal class Module : GameObject
     {
-        public readonly int width, height; // Width and height in cells
+        public readonly int height, width; // Width and height in cells
         public Transform relativePosition; // relative to ship center
         private float currentHealthFraction = 1;
         private Attribute<float> maxHealth;
@@ -39,16 +44,17 @@ namespace SaSimulator
         private Attribute<float> mass;
         public float EnergyUse { get { return energyUse; } }
         public float EnergyGen { get { return energyGen; } }
+        public float MaxHealth { get { return maxHealth; } }
         public float Mass { get { return mass; } }
         private readonly float penetrationBlocking; // reduces damage of penetrating weapons by a fraction after hitting this. This is 0 for most modules
         public readonly List<ModuleComponent> components = [];
         public readonly Ship ship;
         public bool DePowered { get; private set; } = false;
 
-        public Module(int height, int width, float maxHealth, float armor, float penetrationBlocking, float reflect, float energyUse, float energyGen, float mass, Ship ship) : base(ship.game)
+        public Module(int width, int height, float maxHealth, float armor, float penetrationBlocking, float reflect, float energyUse, float energyGen, float mass, Ship ship) : base(ship.game)
         {
-            this.width = width;
             this.height = height;
+            this.width = width;
             this.armor = new(armor);
             this.penetrationBlocking = penetrationBlocking;
             this.ship = ship;
@@ -75,7 +81,7 @@ namespace SaSimulator
         {
             Sprite outline = new("borderless_cell")
             {
-                Size = new(width + .3f, height + .3f),
+                Size = new(height + .3f, width + .3f),
                 Color = ship.side == 0 ? Color.Blue : Color.Red
             };
             outline.SetTransform(WorldPosition);
@@ -86,7 +92,7 @@ namespace SaSimulator
         {
             Sprite sprite = new("cell")
             {
-                Size = new(width, height)
+                Size = new(height, width)
             };
             sprite.SetTransform(WorldPosition);
             sprite.Color = IsDestroyed ? Color.Black : new(1 - (float)currentHealthFraction, (float)currentHealthFraction, 0);
@@ -180,6 +186,11 @@ namespace SaSimulator
         {
             ship.mass += Mass;
             ship.modulesAlive++;
+
+            foreach (var component in components)
+            {
+                component.Init(this);
+            }
         }
 
         static readonly StatType[] BaseModuleStats = [StatType.Health, StatType.Health, StatType.Health, StatType.Health, StatType.Health];
@@ -234,7 +245,8 @@ namespace SaSimulator
     {
         public virtual ModuleTag[] Tags() { return []; }
         public virtual void Tick(Time dt, Module thisModule) { }
-        public virtual void OnDestroyed(Module module) { }
+        public virtual void Init(Module thisModule) { }
+        public virtual void OnDestroyed(Module thisModule) { }
         public virtual void ApplyBuff(ModuleBuff buff, Module thisModule) { } // assumes the buff should affect this module and modifies one of the base module stats
         public virtual void Draw(SpriteBatch batch, Module thisModule) { }
     }
@@ -362,9 +374,13 @@ namespace SaSimulator
                 timeSinceDamageTaken = 0.Seconds();
             }
 
+            public override void Init(Module thisModule)
+            {
+                this.thisModule ??= thisModule;
+            }
+
             public override void Tick(Time dt, Module thisModule)
             {
-                this.thisModule??=thisModule;
                 if (mustReapply) // this shouldn't really happen, as no module bonuses affect shield radius. it is here for completeness.
                 {
                     thisModule.ship.RemoveShield(this);
@@ -519,11 +535,17 @@ namespace SaSimulator
 
         public class MissileGun(float fireRate, float maxAmmo, int burstFireThreshold,
             Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread, float radius,
-            float damage, float guidanceStrength) :
+            float damage, float guidanceStrength, Time duration) :
             BurstGun(fireRate, maxAmmo, burstFireThreshold, burstFireInterval, range, bulletSpeed, firingArc, spread, damage)
         {
+            Time dur = duration;
             Attribute<float> radius = new(radius);
             public override ModuleTag[] Tags() => [ModuleTag.Weapon, ModuleTag.Missile];
+
+            public override void Init(Module thisModule)
+            {
+                duration = dur;
+            }
 
             public override void Fire(Module thisModule)
             {
@@ -673,6 +695,27 @@ namespace SaSimulator
                         return;
                     }
                 }
+            }
+        }
+
+        public class ModuleBonus(string name, ModuleBuff buff) : ModuleComponent
+        {
+            public override void Init(Module thisModule)
+            {
+                thisModule.ship.ThisPlayer().AddModuleBonus(name, buff);
+            }
+
+            public override void OnDestroyed(Module thisModule)
+            {
+                thisModule.ship.ThisPlayer().RemoveModuleBonus(name);
+            }
+        }
+
+        public class Debug() : ModuleComponent
+        {
+            public override void Tick(Time dt, Module thisModule)
+            {
+                Console.WriteLine($"module health: {thisModule.MaxHealth}");
             }
         }
     }

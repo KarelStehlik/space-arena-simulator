@@ -68,16 +68,15 @@ namespace SaSimulator
             foreach (ModulePlacement placement in info.modules)
             {
                 // create the requested module
-                MethodInfo method = typeof(ModuleCreation).GetMethod(placement.module) ?? throw new ArgumentException($"No such module: {placement.module}");
-                Module module = method.Invoke(null, [this]) as Module ?? throw new ArgumentException($"Unable to create module: {placement.module}");
+                Module module = ModuleCreation.Create(placement.module, this);
                 module.relativePosition = new(placement.x.Cells(), placement.y.Cells(), 0);
 
                 modules.Add(module);
-                cellCount += module.width * module.height;
+                cellCount += module.height * module.width;
 
                 // determine ship width and height
-                width = Math.Max(width, placement.x + module.width);
-                height = Math.Max(height, placement.y + module.height);
+                width = Math.Max(width, placement.x + module.height);
+                height = Math.Max(height, placement.y + module.width);
 
                 foreach (ModuleComponent component in module.components)
                 {
@@ -106,19 +105,20 @@ namespace SaSimulator
             {
                 int xGridPos = (int)module.relativePosition.x.Cells + maxShieldRadius;
                 int yGridPos = (int)module.relativePosition.y.Cells + maxShieldRadius;
-                for (int x = xGridPos; x < xGridPos + module.width; x++)
+                Console.WriteLine($"{module.height}, {module.width}");
+                for (int x = xGridPos; x < xGridPos + module.height; x++)
                 {
-                    for (int y = yGridPos; y < yGridPos + module.height; y++)
+                    for (int y = yGridPos; y < yGridPos + module.width; y++)
                     {
                         if (cells[x, y] != null)
                         {
-                            throw new ArgumentException($"Invalid ship: Cell [{x}, {y}] is covered by multiple modules.");
+                            throw new ArgumentException($"Invalid ship: Cell [{x-maxShieldRadius}, {y- maxShieldRadius}] is covered by multiple modules.");
                         }
                         cells[x, y] = new(module);
                     }
                 }
                 // set module position relative to ship center
-                module.relativePosition += new Transform((-width + module.width + 2 * maxShieldRadius).Cells() / 2, (-height + module.height + 2 * maxShieldRadius).Cells() / 2, 0);
+                module.relativePosition += new Transform((-width + module.height + 2 * maxShieldRadius).Cells() / 2, (-height + module.width + 2 * maxShieldRadius).Cells() / 2, 0);
             }
 
             // activate shields
@@ -266,6 +266,13 @@ namespace SaSimulator
             if (IsCriticallyDamaged())
             {
                 IsDestroyed = true;
+                foreach(Module m in modules)
+                {
+                    if (!m.IsDestroyed)
+                    {
+                        m.TakeDamage(float.PositiveInfinity, DamageType.Explosive);
+                    }
+                }
                 return;
             }
 
