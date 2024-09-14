@@ -1,2 +1,48 @@
 # Space Arena Simulator
 ## A tool designed to simulate battles in the mobile game [Space Arena](https://space-arena.com/)
+
+# What is this meant to accomplish?
+
+In the Space Arena game, it can be difficult to properly test a build. The game doesn't tell you what the opponent is using, so it is difficult to know whether the game was decided by a build mistake, rock paper scissors, upgrades or random chance.
+
+Additionally, there is no option to challenge a particular player, so the only way to repeat a battle is by finding that same opponent again through random matchmaking. Even then, you have no guarantee that they are using the same build in most fights.
+
+This simulator addresses the issue of not knowing the enemy by letting you determine both fleets, and the issue of randomness by running many battles in parallel.
+
+# Setting up the program
+
+The source code is located in ./SaSimulator/. If you wish to build from source you should only need to install all NuGet dependencies. I used the Monogame library for graphics, in case of complications refer to the tutorial at [their website](https://docs.monogame.net/articles/getting_started/index.html)
+
+## Setting up the simulation
+
+The program will expect at least two files: one describing the battle and one describing all used modules. The example directory has examples of these, that is testFile.txt and modules.txt respectively. The program takes these as arguments, -F and -M respectively. Optionally, you can specify a second modules file with -N to be used by the second player, in case one player's modules have different stats due to upgrades.
+
+## File formats
+
+File formats are as you see in the example files. For the module description file, it is heavily recommended to simply copy the example and make modifications to specific numbers if needed.
+
+The battle description file contains a list of ships. On the first line of a ship's description are its speed and turning speed stats. On every subsequent line there is a module name (defined in the modules file), and a sequence of integers which denote the locations where this module is placed. for example, "MediumSteelArmor 0 0 0 2 0 4" would denote 3 medium steel armors placed above each other, with their bottom left corners at (0,0), (0,2) and (0,4).
+
+The battle description file contains global bonuses that apply throughout the game, such as "Armor Health 0.2" to increase the health of all armor modules by 20%. It also contains bonuses specific to each player, which will apply to modules in that player's fleet. Each module has a unique module bonus, which will stay active as long as your fleet has at least one of that module. These bonuses are all additive with each other. A stat going negative has undefined results.
+
+Currently, the modifiable stats are [Health, Damage, Armor, Reflect, Firerate, Mass, EnergyUse, EnergyGen, Range, WarpForce, RepairRate, MaxRepair, FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, ShieldRadius, ExplosionRadius, JunkHealth, AfterburnerThrust, AfterburnerTurning],
+
+And the module categories to which they can be applied are [Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, RepairBay, Engine, Junk, PointDefense, Reactor].
+
+Though, some combinations are going to have no effect, such as "Armor RepairRate x" (armor cannot repair anything.)
+
+## Running the program
+
+Now that the module and ship files are in place, try running the program with graphics. In this case, the command would be "./SaSimulator.exe -G -F testFile.txt -M modules.txt". You should see a window pop up with a real-time simulation of one battle, then close. The graphics mode is mainly useful for verifying that everything works as expected and the ships are set up as they should be.
+
+If you do not set -G, the simulation will work the same, but you will only see the result immediately in the command prompt.
+
+## other command line options
+
+Space arena game mechanics and battle results can depend on framerate, use -D to set the number of seconds per game tick. Higher values can also make the simulation run faster.
+
+-T specifies the time in seconds after which the battle will be considered a draw, and won't contribute to the win rate calculation. There is no such mechanic in Space Arena. Long battles are generally caused by both ships surviving in a crippled state unable to properly hit each other, meaning they are close enough to equal, and continuing to simulate them for a potentially unlimited amount of time could be wasteful.
+
+If you are using -G, it may be useful to set the game speed with -S, maybe to slow things down and get a better look at what is gong on.
+
+If you are not using graphics, you can specify the number of battles to simulate using -N. These battles will be performed as quickly as possible using parallel processing.
