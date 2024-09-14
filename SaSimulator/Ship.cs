@@ -19,7 +19,10 @@ namespace SaSimulator
         // This conversion happens here.
         public readonly int x = y, y = x;
     }
-    // ShipInfo describes the layout of a ship and all modules on it, as well as their stat modifiers.
+
+    /// <summary>
+    /// describes the layout of a ship and all modules on it, as well as their stat modifiers.
+    /// </summary>
     internal class ShipInfo
     {
         public Speed speed = 1.CellsPerSecond();
@@ -42,9 +45,9 @@ namespace SaSimulator
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
                                         // Each module is stored here once for every cell it covers
         public readonly List<Module> modules = []; // stores each module once
-        private readonly int cellCount = 0; // # of cells occupied by modules
+        private readonly int cellCount = 0; // number of cells occupied by modules
         private readonly int initialModuleNumber;
-        public int modulesAlive = 0;
+        public int modulesAlive = 0, energyModulesAlive = 0, weaponsAlive = 0;
         private readonly int width = 0, height = 0; // in cells
         public readonly int side;
         private Speed baseAcceleration, vx = 0.CellsPerSecond(), vy = 0.CellsPerSecond();
@@ -54,8 +57,8 @@ namespace SaSimulator
         public float turnPower = 0, thrust = 0, energy = 0, energyUse = 0, warpForce = 0, afterburnerThrust=1, afterburnerTurnPower=1; // these are recalculated every tick
 
         private float energyPhase = 0, warpProgress = 0;
-        private Time energyCycleDuration = 5.Seconds();
-        private Distance maxWeaponRange = 0.Cells();
+        private static readonly Time energyCycleDuration = 5.Seconds();
+        private readonly Distance maxWeaponRange = 0.Cells();
 
         public Ship(ShipInfo info, Game game, int side) : base(game)
         {
@@ -107,7 +110,6 @@ namespace SaSimulator
             {
                 int xGridPos = (int)module.relativePosition.x.Cells + maxShieldRadius;
                 int yGridPos = (int)module.relativePosition.y.Cells + maxShieldRadius;
-                Console.WriteLine($"{module.height}, {module.width}");
                 for (int x = xGridPos; x < xGridPos + module.height; x++)
                 {
                     for (int y = yGridPos; y < yGridPos + module.width; y++)
@@ -185,7 +187,7 @@ namespace SaSimulator
         // [speculative game mechanic] it is unclear what "seriously damaged" means.
         private bool IsCriticallyDamaged()
         {
-            return modulesAlive < initialModuleNumber * 0.3;
+            return modulesAlive < initialModuleNumber * 0.3 || energyModulesAlive ==0 || (weaponsAlive==0 && (ThisPlayer().ships.Count == 1 || this!= ThisPlayer().ships[0]));
         }
 
         private enum MovementAction { Forward, Retreat, CircleLeft, CircleRight };
@@ -267,6 +269,19 @@ namespace SaSimulator
             WorldPosition += new Transform(warpDistance.Cells(), 0.Cells(), 0);
         }
 
+        // Destroys the ship.
+        private void Destroy()
+        {
+            IsDestroyed = true;
+            foreach (Module m in modules)
+            {
+                if (!m.IsDestroyed)
+                {
+                    m.Destroy();
+                }
+            }
+        }
+
         public override void Tick(Time dt)
         {
             // passive actions
@@ -278,17 +293,11 @@ namespace SaSimulator
 
             if (IsCriticallyDamaged())
             {
-                IsDestroyed = true;
-                foreach(Module m in modules)
-                {
-                    if (!m.IsDestroyed)
-                    {
-                        m.TakeDamage(float.PositiveInfinity, DamageType.Explosive);
-                    }
-                }
+                Destroy();
                 return;
             }
 
+            // modules can increase these with their Tick()
             turnPower = 0; thrust = 0; energy = 0; energyUse = 0; warpForce = 0; afterburnerThrust = 1; afterburnerTurnPower = 1;
 
             foreach (Module module in modules)
@@ -301,7 +310,7 @@ namespace SaSimulator
             energyPhase %= 1;
             if (!IsPowered())
             {
-                return; // everything past this point requires power
+                return; // everything past this point requires energy
             }
 
             // tick modules
@@ -321,7 +330,7 @@ namespace SaSimulator
                 warpProgress += dt / (MIN_WARP_TIME + (cellCount / warpForce).Seconds());
                 if (warpProgress >= 1)
                 {
-                    warpProgress = 0;
+                    warpProgress = (float)(game.rng.NextDouble()*0.1-0.05);
                     Warp();
                 }
             }
@@ -464,7 +473,6 @@ namespace SaSimulator
                 }
                 pos += step;
             }
-            yield break;
         }
     }
 }

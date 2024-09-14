@@ -9,11 +9,11 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
-    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, Energy, RepairBay, Engine, Junk, PointDefense, Reactor }
+    enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, RepairBay, Engine, Junk, PointDefense, Reactor }
     enum StatType
     {
         Health, Damage, Armor, Reflect, Firerate, Mass, EnergyUse, EnergyGen, Range, WarpForce, RepairRate, MaxRepair,
-        FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, Radius, ExplosionRadius, JunkHealth, ThrustMultiplier, TurnMultiplier
+        FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, ShieldRadius, ExplosionRadius, JunkHealth, AfterburnerThrust, AfterburnerTurning
     }
     // This represents a bonus to a specific stat on specific modules, such as "20% increased health of weapon modules"
     internal class ModuleBuff(float multiplier, StatType stat, ModuleTag targetModule)
@@ -135,14 +135,20 @@ namespace SaSimulator
             }
         }
 
-        private void Destroy()
+        // destroys this module
+        public void Destroy()
         {
             IsDestroyed = true;
+            bool isPower = energyGen > 0;
+            bool isWeapon = false;
             foreach (var component in components)
             {
                 component.OnDestroyed(this);
+                isWeapon |= component.Tags().Contains(ModuleTag.Weapon);
             }
             ship.modulesAlive--;
+            ship.weaponsAlive -= isWeapon ? 1 : 0;
+            ship.energyModulesAlive -= isPower ? 1 : 0;
             ship.mass -= mass; // [speculative game mechanic] it is unknown whether ships lose mass when modules are destroyed.
         }
 
@@ -186,11 +192,16 @@ namespace SaSimulator
         {
             ship.mass += Mass;
             ship.modulesAlive++;
+            bool isPower = energyGen > 0;
+            bool isWeapon = false;
 
             foreach (var component in components)
             {
                 component.Init(this);
+                isWeapon |= component.Tags().Contains(ModuleTag.Weapon);
             }
+            ship.weaponsAlive += isWeapon ? 1 : 0;
+            ship.energyModulesAlive += isPower ? 1 : 0;
         }
 
         static readonly StatType[] BaseModuleStats = [StatType.Health, StatType.Health, StatType.Health, StatType.Health, StatType.Health];
@@ -318,10 +329,10 @@ namespace SaSimulator
             {
                 switch (buff.stat)
                 {
-                    case StatType.ThrustMultiplier:
+                    case StatType.AfterburnerThrust:
                         thrust.Increase += buff.multiplier;
                         break;
-                    case StatType.TurnMultiplier:
+                    case StatType.AfterburnerTurning:
                         turning.Increase += buff.multiplier;
                         break;
                 }
@@ -413,7 +424,7 @@ namespace SaSimulator
                 {
                     case StatType.Strength:
                         strength.Increase += buff.multiplier; break;
-                    case StatType.Radius:
+                    case StatType.ShieldRadius:
                         radius.Increase += buff.multiplier;
                         mustReapply = true; break;
                     case StatType.RegenRate:
@@ -590,6 +601,20 @@ namespace SaSimulator
                 thisModule.game.AddObject(
                         new Projectile(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
                         speed, duration, damage, thisModule.ship.side, new(1, 1, .2f, .5f)));
+            }
+        }
+
+        public class PenetratingGun(float fireRate, float maxAmmo, int burstFireThreshold,
+            Time burstFireInterval, Distance range, Speed bulletSpeed, float firingArc, float spread,
+            float damage, float penetration) :
+            BurstGun(fireRate,maxAmmo,burstFireThreshold,burstFireInterval,range,bulletSpeed,firingArc,spread,damage)
+        {
+            Attribute<float> penetration = new(penetration);
+            public override void Fire(Module thisModule)
+            {
+                thisModule.game.AddObject(
+                        new PenetratingProjectile(thisModule.game, new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule)),
+                        speed, duration, damage, thisModule.ship.side, new(1, 1, .2f, .5f), penetration));
             }
         }
 

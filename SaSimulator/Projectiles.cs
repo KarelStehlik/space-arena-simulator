@@ -162,6 +162,36 @@ namespace SaSimulator
         }
     }
 
+    internal class PenetratingProjectile(Game game, Transform transform, Speed speed, Time duration, float damage, int side, Color color, float penetration) :
+        Projectile(game, transform, speed, duration, damage, side, color)
+    {
+        private float penetration = penetration;
+
+        protected override void OnHit(JunkPiece target)
+        {
+            target.TakeDamage(damage);
+            damage *= penetration;
+        }
+
+        protected override void OnHit(Ship target, HitDetected hit)
+        {
+            foreach (Modules.Shield shield in hit.cell.coveringShields)
+            {
+                if (shield.IsActive())
+                {
+                    shield.TakeShieldDamage(damage, DamageType.Ballistics);
+                    damage *= penetration;
+                }
+            }
+            if (hit.cell.module == null || hit.cell.module.IsDestroyed)
+            {
+                return;
+            }
+            damage = hit.cell.module.TakeDamage(damage, DamageType.Ballistics) * penetration;
+            IsDestroyed |= damage<=0;
+        }
+    }
+
 
     internal class Laser(Game game, Transform transform, Distance length, float damage, int side, Color color) :
         Projectile(game, transform, length / 1.Seconds(), 0.Seconds(), damage, side, color)

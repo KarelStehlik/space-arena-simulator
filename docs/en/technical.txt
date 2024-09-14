@@ -1,0 +1,23 @@
+# Overview
+
+We use "CommandLineParser" to parse arguments, then FileLoading.cs to load information from the given module and battle files.
+
+We pass this information to a new Game, and we call its Tick() method until it has concluded (game.Result changes from Game.GameResult.unfinished). The process of creating and running a Game has no side effects, meaning there is no issue running multiple of them in parallel. Alternatively, we can open a MonoGame window to view one battle. the Game and GameObjects in it have a Draw() method, which is only ever called if graphics are on. This does not need to be particularly fast, we have the no-graphics mode for fast simulations.
+
+The Game will initially create both players' Ships, then on Tick() it will check whether the battle is over, populate collision detection, tick all game objects, and remove destroyed ones. Game objects can create others via Game.AddObject() (eg. weapons creating projectiles) and interact with others by querying the relevant collision detection structure (eg. player 0's projectiles query Game.hittableP1).
+
+The game state is mostly stored in its game objects. These inherit from the GameObject class, meaning they all have a world position, a reference back to the game, a flag that indicates whether they are destroyed, may request to be added to collision detection with BelongsToGrid(), and may override Draw() for graphics or Tick().
+
+# current GameObjects
+
+## Ships and Modules
+
+Each Ship consists of modules arranged in a square grid, which it initializes using ModuleCreation.cs. In this simulator, a ship's shape is determined solely by its modules. On ticking, it will update and tick all of these modules, which can take various actions such as shooting bullets at the enemy or healing friendly modules. Modules are managed by the ship they are a part of, not the game itself.
+
+## JunkPiece
+
+Junk is a simple game object that exists for some duration and can block enemy projectiles.
+
+## Projectiles
+
+Projectiles have a Tick() method where they will move and collide with enemy ships (and junk) on the way, dealing damage. If graphics are on, projectiles will also leave behind a BulletTrail, which is a purely visual game object. Current projectiles are basic ones (that is ballistics), missiles which follow the target and do AoE damage on contact with a ship, and lasers which bypass shields and travel instantly.

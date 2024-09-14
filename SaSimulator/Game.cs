@@ -1,7 +1,6 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Drawing;
 using System.Linq;
 using static SaSimulator.Physics;
@@ -20,14 +19,20 @@ namespace SaSimulator
         public virtual UniformGrid? BelongsToGrid() { return null; }
     }
 
+    /// <summary>
+    /// Stores data relating to a player's fleet, such as ships and stat modifiers.
+    /// </summary>
+    /// <param name="buffs">permanent modifiers to the player's modules</param>
+    /// <param name="possibleModules">modules which the player's ships can use</param>
     internal class Player(List<ModuleBuff> buffs, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> possibleModules)
     {
         public readonly IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> possibleModules=possibleModules;
 
         public readonly List<Ship> ships = [];
-        public readonly List<ModuleBuff> buffs = buffs;
+        public readonly IReadOnlyList<ModuleBuff> buffs = buffs;
 
-        // Module bonuses: Having at least 1 of a particular type of module in your fleet grants a buff to all ships in the fleet.
+        // [game mechanic] Module bonuses:
+        // Having at least 1 of a particular type of module in your fleet grants a buff to all ships in the fleet.
         // this buff is specific to that module type, IE. Chaingun has a different bonus than Missile Launcher.
         // This buff vanishes when all modules of that type have been destroyed.
         private class ModuleBonus(ModuleBuff buff)
@@ -50,7 +55,6 @@ namespace SaSimulator
         public void RemoveModuleBonus(string name)
         {
             ModuleBonus bonus = uniqueModuleBonuses[name];
-            Console.WriteLine(bonus.grantedBy);
             if (--bonus.grantedBy == 0)
             {
                 foreach (Ship ship in ships)
@@ -77,21 +81,31 @@ namespace SaSimulator
         }
     }
 
-    internal class Game(ShipLists ships, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p0Modules, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p1Modules, bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
+    /// <summary>
+    /// directs the course of a game, ticks game objects and allows them to interact with each other. Ends when one of the players has no more ships left.
+    /// </summary>
+    /// <param name="ships">information from the battle description file</param>
+    /// <param name="p0Modules">information from the player 0 module file</param>
+    /// <param name="p1Modules">information from the player 1 module file</param>
+    /// <param name="hasGraphics">determines whether the game should call graphics updates on objects.</param>
+    /// <param name="timeout">after this amount of in-game time, the game will be considered a draw.</param>
+    /// <param name="randomSeed"></param>
+    /// <param name="deltatime">should be used to simulate lag, which affects certain game mechanics in Space Arena. A reasonable value for lag-free gameplay is 1/30 seconds</param>
+    internal class Game(ShipLists ships,
+        IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p0Modules, IReadOnlyDictionary<string, ModuleCreation.ModuleInfo> p1Modules,
+        bool hasGraphics, Time timeout, int randomSeed, Time deltatime)
     {
         public readonly Time deltaTime = deltatime;
         public readonly bool hasGraphics = hasGraphics;
         public enum GameResult { win_0, win_1, draw, unfinished };
         public GameResult Result { get; private set; } = GameResult.unfinished;
-        public readonly Player player0 = new(new(ships.player0Buffs), p0Modules), player1 = new(new(ships.player1Buffs), p1Modules);
+        public readonly Player player0 = new(new(ships.player0Buffs.Concat(ships.globalBuffs)), p0Modules), player1 = new(new(ships.player1Buffs.Concat(ships.globalBuffs)), p1Modules);
         private readonly List<GameObject> gameObjects = [], newGameObjects = [];
         private readonly List<ShipInfo> player0ShipList = ships.player0, player1ShipList = ships.player1;
         public Time Time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
-        // TODO: multiple detection grids for different objects (junk, enemy junk, missiles...)
-        // TODO: modify grid density based on number of junk launchers
-        public readonly UniformGrid hittableP0 = new(10), hittableP1 = new(10), missilesP1 = new(10), missilesP0 = new(10);
+        public readonly UniformGrid hittableP0 = new(1), hittableP1 = new(1), missilesP1 = new(10), missilesP0 = new(10); // collision detection data structures
         public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
                                                               // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
 
@@ -109,8 +123,6 @@ namespace SaSimulator
                 player1.ships.Add(ship);
                 gameObjects.Add(ship);
             }
-            player0.buffs.AddRange(ships.globalBuffs);
-            player1.buffs.AddRange(ships.globalBuffs);
             player0.ApplyAllBuffs();
             player1.ApplyAllBuffs();
         }
@@ -143,8 +155,6 @@ namespace SaSimulator
             newGameObjects.Add(obj);
         }
 
-        // dt should be used to simulate lag, which affects certain game mechanics in Space Arena.
-        // A reasonable value for lag-free gameplay is 1/30 seconds
         public void Tick()
         {
             Time += deltaTime;
@@ -187,7 +197,7 @@ namespace SaSimulator
                 obj.BelongsToGrid()?.Add(obj);
             }
 
-            // game tick
+            // tick objects
             foreach (GameObject obj in gameObjects)
             {
                 obj.Tick(deltaTime);

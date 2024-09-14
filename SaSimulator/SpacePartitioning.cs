@@ -154,7 +154,20 @@ namespace SaSimulator
             float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation);
 
             bool steppingY = Math.Abs(sin) > Math.Abs(cos);
+
             Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));
+
+            if (origin.rotation < Math.PI * 0.25)
+            {
+                Console.WriteLine("---");
+                Console.WriteLine(origin.Position);
+                Console.WriteLine(origin.rotation);
+                Console.WriteLine($"{chunkWidth},{chunkHeight}");
+                Console.WriteLine(length);
+                Console.WriteLine(step);
+                Console.WriteLine("x");
+            }
+
             if (sin < 0)
             {
                 step *= -1;
@@ -185,6 +198,10 @@ namespace SaSimulator
                 // check the [x, lastY] chunk
                 if (steppingY && x != lastX && IsChunk(x, lastY))
                 {
+                    if (origin.rotation < Math.PI * 0.25)
+                    {
+                        Console.WriteLine($"{x},{lastY}");
+                    }
                     foreach (var record in records[x, lastY])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))
@@ -197,6 +214,10 @@ namespace SaSimulator
                 // check the [lastX, y] chunk
                 if (!steppingY && y != lastY && IsChunk(lastX, y))
                 {
+                    if (origin.rotation < Math.PI * 0.25)
+                    {
+                        Console.WriteLine($"{lastX},{y}");
+                    }
                     foreach (var record in records[lastX, y])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))
@@ -209,6 +230,10 @@ namespace SaSimulator
                 // check [x,y]
                 if (IsChunk(x, y))
                 {
+                    if (origin.rotation < Math.PI * 0.25)
+                    {
+                        Console.WriteLine($"{x},{y}");
+                    }
                     foreach (var record in records[x, y])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))

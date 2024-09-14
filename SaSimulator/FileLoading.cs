@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using static SaSimulator.Modules;
-using static System.Net.Mime.MediaTypeNames;
-using System.Text;
-using System.Threading;
 
 namespace SaSimulator
 {
