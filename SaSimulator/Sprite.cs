@@ -4,6 +4,9 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
+    /// <summary>
+    /// A layer over MonoGame drawing that i personally find more natural.
+    /// </summary>
     internal class Sprite
     {
         private readonly Texture2D texture;

@@ -13,6 +13,10 @@ namespace SaSimulator
         public float zoom = 2;
         public Vector2 position;
     }
+    /// <summary>
+    /// only relevant for graphics mode.
+    /// This manages a Game, will tick that Game in real time, and will call graphics updates which render to this window.
+    /// </summary>
     internal class MonoGameWindow : Microsoft.Xna.Framework.Game
     {
         public Camera camera = new();

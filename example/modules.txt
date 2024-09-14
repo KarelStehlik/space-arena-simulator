@@ -1,0 +1,179 @@
+--- module ---
+
+Chaingun
+Any Armor 0.0025
+height=1, width=1, maxHealth=15, armor=0, penetrationBlocking=0, reflect=0, energyUse=10, energyGen=0, mass=10
+- components -
+BurstGun | fireRate=3.3333, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=35, bulletSpeed=200, firingArc=70, spread=10, damage=4
+
+--- module ---
+
+SmallSteelArmor
+Any Reflect 0.0011
+height=1, width=1, maxHealth=145, armor=3, penetrationBlocking=0, reflect=.55, energyUse=0, energyGen=0, mass=75
+- components -
+Armor |
+
+--- module ---
+
+SmallIonDrive
+Any EnergyGen 0.0021
+height=1, width=1, maxHealth=60, armor=2, penetrationBlocking=0, reflect=.25, energyUse=5, energyGen=0, mass=10
+- components -
+Engine | thrust=900, turning=1200, warp=0
+
+--- module ---
+
+SmallReactor
+Any Health 0.0025
+height=1, width=1, maxHealth=20, armor=0, penetrationBlocking=0, reflect=0, energyUse=0, energyGen=50, mass=10
+- components -
+Reactor |
+DeathExplode | radius=1, damage=10
+
+--- module ---
+
+VulcanCannon
+Any Health 0.0025
+height=2, width=1, maxHealth=40, armor=0, penetrationBlocking=0, reflect=0, energyUse=20, energyGen=0, mass=25
+- components -
+BurstGun | fireRate=3.3333, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=40, bulletSpeed=250, firingArc=70, spread=10, damage=5
+
+--- module ---
+
+RocketLauncher
+Any EnergyUse -0.0018
+height=2, width=1, maxHealth=35, armor=0, penetrationBlocking=0, reflect=0, energyUse=30, energyGen=0, mass=40
+- components -
+MissileGun | fireRate=0.714, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=45, bulletSpeed=100, firingArc=60, spread=40, damage=14, radius=1.2, guidanceStrength=2, duration=4
+
+--- module ---
+
+SmallLaser
+Any Health 0.0025
+height=1, width=1, maxHealth=15, armor=0, penetrationBlocking=0, reflect=0, energyUse=20, energyGen=0, mass=15
+- components -
+LaserGun | fireRate=2.5, duration=0.15, range=35, firingArc=70, damage=20
+
+--- module ---
+
+SmallShield
+Any EnergyGen 0.0021
+height=1, width=1, maxHealth=15, armor=0, penetrationBlocking=0, reflect=0, energyUse=60, energyGen=0, mass=10
+- components -
+Shield | strength=100, radius=6.1, regenRate=20, maxRegen=100
+
+--- module ---
+
+LaserBeam
+Any EnergyUse -0.0018
+height=2, width=1, maxHealth=35, armor=0, penetrationBlocking=0, reflect=0, energyUse=40, energyGen=0, mass=30
+- components -
+LaserGun | fireRate=0.5, duration=1.5, range=60, firingArc=60, damage=25
+
+--- module ---
+
+WarpDrive
+Any EnergyGen 0.0021
+height=2, width=1, maxHealth=75, armor=1, penetrationBlocking=0, reflect=.25, energyUse=60, energyGen=0, mass=30
+- components -
+Engine | thrust=1, turning=0, warp=12
+
+--- module ---
+
+SmallSolarArmor
+Any Range 0.0055
+height=1, width=1, maxHealth=75, armor=2, penetrationBlocking=0, reflect=.5, energyUse=0, energyGen=10, mass=50
+- components -
+Armor |
+
+--- module ---
+
+VectoredThruster
+Any EnergyGen 0.0021
+height=1, width=2, maxHealth=90, armor=1, penetrationBlocking=0, reflect=.25, energyUse=30, energyGen=0, mass=20
+- components -
+Engine | thrust=0, turning=7000, warp=0
+
+--- module ---
+
+VulcanTurret
+Any Range 0.0035
+height=2, width=2, maxHealth=90, armor=0, penetrationBlocking=0, reflect=0, energyUse=45, energyGen=0, mass=80
+- components -
+BurstGun | fireRate=3.03, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=40, bulletSpeed=250, firingArc=360, spread=10, damage=6
+
+--- module ---
+
+MediumReactor
+Any Reflect 0.0011
+height=2, width=2, maxHealth=90, armor=1, penetrationBlocking=0, reflect=0, energyUse=0, energyGen=250, mass=50
+- components -
+Reactor |
+DeathExplode | radius=2, damage=50
+
+--- module ---
+
+RocketTurret
+Any Health 0.0025
+height=2, width=2, maxHealth=85, armor=0, penetrationBlocking=0, reflect=0, energyUse=6, energyGen=0, mass=100
+- components -
+MissileGun | fireRate=1, maxAmmo=2, burstFireThreshold=2, burstFireInterval=0, range=50, bulletSpeed=100, firingArc=360, spread=40, damage=14, radius=1.2, guidanceStrength=2, duration=4
+
+--- module ---
+
+MediumSteelArmor
+Any Armor 0.0025
+height=2, width=2, maxHealth=550, armor=4, penetrationBlocking=0, reflect=.55, energyUse=0, energyGen=0, mass=300
+- components -
+Armor |
+
+--- module ---
+
+Afterburner
+Any EnergyGen 0.0021
+height=2, width=1, maxHealth=75, armor=1, penetrationBlocking=0, reflect=.25, energyUse=60, energyGen=0, mass=30
+- components -
+Afterburner | thrust=3, turning=6.5, duration=3
+
+
+--- module ---
+
+Junk
+Any Armor 0.0025
+height=2, width=2, maxHealth=250, armor=2, penetrationBlocking=0, reflect=0, energyUse=60, energyGen=0, mass=120
+- components -
+JunkLauncher| fireRate=1.333, maxAmmo=4, burstFireThreshold=4, burstFireInterval=0, range=70, bulletSpeed=10, junkHealth=10, duration=15
+
+--- module ---
+
+LargeIonDrive
+Any Reflect 0.0011
+height=2, width=2, maxHealth=280, armor=3, penetrationBlocking=0, reflect=.25, energyUse=25, energyGen=0, mass=35
+- components -
+Engine | thrust=6000, turning=6500, warp=0
+
+--- module ---
+
+Railgun
+Any Armor 0.0025
+height=3, width=1, maxHealth=60, armor=0, penetrationBlocking=0, reflect=0, energyUse=30, energyGen=0, mass=50
+- components -
+BurstGun | fireRate=0.4, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=65, bulletSpeed=2000, firingArc=70, spread=0, damage=19
+
+--- module ---
+
+PointDefense
+Any Armor 0.0025
+height=2, width=2, maxHealth=200, armor=2, penetrationBlocking=0, reflect=20, energyUse=45, energyGen=0, mass=200
+- components -
+PointDefense| fireRate=10, missileInterceptChance=.3, torpedoInterceptChance=.3, mineInterceptChance=.3, range=19
+
+
+--- module ---
+
+PenGun
+Any Armor 0.0025
+height=1, width=1, maxHealth=60, armor=0, penetrationBlocking=0, reflect=0, energyUse=3, energyGen=0, mass=50
+- components -
+PenetratingGun | fireRate=4, maxAmmo=1, burstFireThreshold=1, burstFireInterval=0, range=150, bulletSpeed=2000, firingArc=70, spread=0, damage=0.001, penetration=0.1

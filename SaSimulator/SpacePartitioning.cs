@@ -6,12 +6,23 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
-    // splits a target area into rectangular chunks.
-    // GameObjects are stored in each of the chunks that they occupy.
-    // When we wish to apply some local effect, we only need to consider GameObjects in chunks touched by this effect.
-    // This should generally lead to better performance than iterating through all game objects, though the worst-case asymptotic complexity is terrible.
+    /// <summary>
+    /// a collision detection data structure.
+    /// splits a target area into rectangular chunks.
+    /// GameObjects are stored in each of the chunks that they occupy.
+    /// When we wish to apply some local effect, we only need to consider GameObjects in chunks touched by this effect.
+    /// This should generally lead to better performance than iterating through all game objects, though the worst-case asymptotic complexity is terrible.
+    /// </summary>
     internal class UniformGrid
     {
+        /// <summary>
+        /// we could simply store the GameObjects in lists directly, and that's not necessarily wrong,
+        /// but then when we're making a query we would need to create a collection of objects
+        /// we've already returned to make sure we return nothing twice
+        /// (as a single object may be stored in multiple chunks that we search through.)
+        /// instead of that, I set lastAccess to the id of the search to know that I've already considered this Record.
+        /// </summary>
+        /// <param name="storedObject">the stored game object</param>
         private class Record(GameObject storedObject)
         {
             public GameObject storedObject = storedObject;
@@ -23,6 +34,10 @@ namespace SaSimulator
         private Distance chunkWidth, chunkHeight;
         private int searchId = int.MinValue;
 
+        /// <summary>
+        /// constructor
+        /// </summary>
+        /// <param name="sideCount">the number of chunks in each dimension. The total number of chunks will then be this squared.</param>
         public UniformGrid(int sideCount)
         {
             records = new List<Record>[sideCount, sideCount];
@@ -35,6 +50,10 @@ namespace SaSimulator
             }
         }
 
+        /// <summary>
+        /// removes all stored objects and sets this grid to cover the given area. Does not change the number of chunks, only their size.
+        /// </summary>
+        /// <param name="bounds"></param>
         public void Reset(RectangleF bounds)
         {
             foreach (List<Record> list in records)
@@ -151,57 +170,45 @@ namespace SaSimulator
         public IEnumerable<GameObject> Get(Transform origin, Distance length)
         {
             searchId++;
-            float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation);
+            float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation); //-.2, +.8
 
-            bool steppingY = Math.Abs(sin) > Math.Abs(cos);
+            bool steppingY = Math.Abs(sin) > Math.Abs(cos);  //false
 
-            Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));
+            Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));  // (1, -0.1)
 
-            if (origin.rotation < Math.PI * 0.25)
+            if ((!steppingY && cos < 0) || (steppingY && sin<0))
             {
-                Console.WriteLine("---");
-                Console.WriteLine(origin.Position);
-                Console.WriteLine(origin.rotation);
-                Console.WriteLine($"{chunkWidth},{chunkHeight}");
-                Console.WriteLine(length);
-                Console.WriteLine(step);
-                Console.WriteLine("x");
+                step = - step;
             }
 
-            if (sin < 0)
-            {
-                step *= -1;
-            }
             Distance stepSize = (steppingY ? chunkHeight : chunkWidth) * step.Length();
 
-            Vector2 chunkCoords = new((origin.x - x) / chunkWidth, (origin.y - y) / chunkHeight);
-
+            Vector2 chunkCoords = new((origin.x - x) / chunkWidth, (origin.y - y) / chunkHeight);   // 50,50
+            
             // align chunk coordinates to the edge of a chunk
             if (steppingY)
             {
-                chunkCoords.X += step.X * ((int)chunkCoords.Y - chunkCoords.Y);
-                chunkCoords.Y = (int)chunkCoords.Y;
+                float newChunkY = (int)chunkCoords.Y + (step.Y < 0 ? 0.999f : 0);
+                chunkCoords.X += step.X * (newChunkY - chunkCoords.Y) / step.Y;
+                chunkCoords.Y = newChunkY;
             }
             else
             {
-                chunkCoords.Y += step.Y * ((int)chunkCoords.X - chunkCoords.X);
-                chunkCoords.X = (int)chunkCoords.X;
+                float newChunkX = (int)chunkCoords.X + (step.X < 0 ? 0.999f : 0);
+                chunkCoords.Y += step.Y * (newChunkX - chunkCoords.X) / step.X;
+                chunkCoords.X = newChunkX;
             }
-
+            
             int lastX = (int)chunkCoords.X, lastY = (int)chunkCoords.Y;
-            float stepsNeeded = length / stepSize;
+            float stepsNeeded = length / stepSize +1;
 
             for (int i = 0; i < stepsNeeded; i++)
             {
                 int x = (int)chunkCoords.X, y = (int)chunkCoords.Y;
-
+                
                 // check the [x, lastY] chunk
                 if (steppingY && x != lastX && IsChunk(x, lastY))
                 {
-                    if (origin.rotation < Math.PI * 0.25)
-                    {
-                        Console.WriteLine($"{x},{lastY}");
-                    }
                     foreach (var record in records[x, lastY])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))
@@ -214,10 +221,6 @@ namespace SaSimulator
                 // check the [lastX, y] chunk
                 if (!steppingY && y != lastY && IsChunk(lastX, y))
                 {
-                    if (origin.rotation < Math.PI * 0.25)
-                    {
-                        Console.WriteLine($"{lastX},{y}");
-                    }
                     foreach (var record in records[lastX, y])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))
@@ -226,14 +229,10 @@ namespace SaSimulator
                         }
                     }
                 }
-
+                
                 // check [x,y]
                 if (IsChunk(x, y))
                 {
-                    if (origin.rotation < Math.PI * 0.25)
-                    {
-                        Console.WriteLine($"{x},{y}");
-                    }
                     foreach (var record in records[x, y])
                     {
                         if (IsRecordOnRay(record, sin, cos, origin))

@@ -9,7 +9,13 @@ using static SaSimulator.Physics;
 
 namespace SaSimulator
 {
+    /// <summary>
+    /// A way to narrow down modules into different (possibly overlapping) types.
+    /// </summary>
     enum ModuleTag { Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, RepairBay, Engine, Junk, PointDefense, Reactor }
+    /// <summary>
+    /// Stats that a module (or module component) may have, which can be modified with Module.ApplyBuff()
+    /// </summary>
     enum StatType
     {
         Health, Damage, Armor, Reflect, Firerate, Mass, EnergyUse, EnergyGen, Range, WarpForce, RepairRate, MaxRepair,
@@ -30,40 +36,29 @@ namespace SaSimulator
 
     enum DamageType { Ballistics, Explosive, Laser };
 
-    // A ship is made of rectangular modules arranged on a square grid.
-    internal class Module : GameObject
+    /// <summary>
+    /// The building block of a ship. Modifies some of the ship's properties such as mass and energy, can have multiple [ModuleComponent]s which do various things.
+    /// </summary>
+    internal class Module(int width, int height, float maxHealth, float armor, float penetrationBlocking,
+        float reflect, float energyUse, float energyGen, float mass, Ship ship) : GameObject(ship.game)
     {
-        public readonly int height, width; // Width and height in cells
+        public readonly int height = height, width = width; // Width and height in cells
         public Transform relativePosition; // relative to ship center
         private float currentHealthFraction = 1;
-        private Attribute<float> maxHealth;
-        private Attribute<float> armor; // reduces non-laser damage taken by a flat amount
-        private Attribute<float> reflect; // reduces laser damage by a fraction
-        private Attribute<float> energyUse;
-        private Attribute<float> energyGen;
-        private Attribute<float> mass;
+        private Attribute<float> maxHealth = new(maxHealth);
+        private Attribute<float> armor = new(armor); // reduces non-laser damage taken by a flat amount
+        private Attribute<float> reflect = new(reflect); // reduces laser damage by a fraction
+        private Attribute<float> energyUse = new(energyUse);
+        private Attribute<float> energyGen = new(energyGen);
+        private Attribute<float> mass = new(mass);
         public float EnergyUse { get { return energyUse; } }
         public float EnergyGen { get { return energyGen; } }
         public float MaxHealth { get { return maxHealth; } }
         public float Mass { get { return mass; } }
-        private readonly float penetrationBlocking; // reduces damage of penetrating weapons by a fraction after hitting this. This is 0 for most modules
+        private readonly float penetrationBlocking = penetrationBlocking; // reduces damage of penetrating weapons by a fraction after hitting this. This is 0 for most modules
         public readonly List<ModuleComponent> components = [];
-        public readonly Ship ship;
+        public readonly Ship ship = ship;
         public bool DePowered { get; private set; } = false;
-
-        public Module(int width, int height, float maxHealth, float armor, float penetrationBlocking, float reflect, float energyUse, float energyGen, float mass, Ship ship) : base(ship.game)
-        {
-            this.height = height;
-            this.width = width;
-            this.armor = new(armor);
-            this.penetrationBlocking = penetrationBlocking;
-            this.ship = ship;
-            this.reflect = new(reflect);
-            this.maxHealth = new(maxHealth);
-            this.energyUse = new(energyUse);
-            this.energyGen = new(energyGen);
-            this.mass = new(mass);
-        }
 
         public void DePower() // disables this module's ticks and power generation until the next game tick
         {

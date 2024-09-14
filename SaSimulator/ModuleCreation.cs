@@ -79,6 +79,12 @@ namespace SaSimulator
             return m;
         }
 
+        /// <summary>
+        /// creates a module with the given name from the ship's player's available modules.
+        /// </summary>
+        /// <param name="name">name of the module, eg. "Chaingun"</param>
+        /// <param name="ship">ship on which to put the module. This ship's player determines the pool of available modules.</param>
+        /// <returns></returns>
         public static Module Create(string name, Ship ship)
         {
             try
@@ -97,6 +103,9 @@ namespace SaSimulator
             public Dictionary<string, float> parameters = [];
         }
 
+        /// <summary>
+        /// All information about a module loaded from the modules file
+        /// </summary>
         public class ModuleInfo()
         {
             public string name="";

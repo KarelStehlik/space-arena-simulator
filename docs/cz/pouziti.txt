@@ -1,0 +1,45 @@
+# Co je cílem programu?
+
+Ve hře Space Arena může být obtížné správně otestovat sestavení. Hra vám neřekne, co používá váš protivník, takže je těžké zjistit, zda byl výsledek bitvy způsoben špatnou strategií, principem kámen-nůžky-papír, upgrady nebo náhodou.
+
+Navíc neexistuje možnost vyzvat konkrétního hráče, takže jediným způsobem, jak zopakovat bitvu, je znovu najít stejného protivníka prostřednictvím náhodného párování. Ani tak však nemáte záruku, že používá stejné sestavení jako v minulém souboji.
+
+Tento simulátor řeší problém neznámého nepřítele tím, že vám umožní určit obě flotily, a problém náhody řeší tím, že spouští mnoho bitev současně.
+
+# Sestavení programu
+
+Zdrojový kód se nachází v ./SaSimulator/. Pokud chcete sestavit program, mělo by stačit nainstalovat všechny závislosti z NuGet. Pro grafiku jsem použil knihovnu MonoGame, v případě komplikací se podívejte na tutoriál na jejich webu.
+
+# Nastavení simulace
+
+Program očekává alespoň dva soubory: jeden popisující bitvu a druhý popisující všechny použité moduly. V adresáři example jsou příklady těchto souborů, konkrétně testFile.txt a modules.txt. Program tyto soubory přijímá jako argumenty, -F a -M. Volitelně můžete specifikovat druhý soubor modulů pomocí -N, který bude použit pro druhého hráče, pokud mají jeho moduly jiné vlastnosti kvůli upgradům.
+
+# Formáty souborů
+
+Formáty souborů jsou takové, jak je vidíte v ukázkových souborech. Pro soubor popisu modulů silně doporučuji jednoduše zkopírovat příklad a upravit konkrétní číselné hodnoty podle potřeby.
+
+Soubor popisu bitvy obsahuje seznam lodí. Na první řádce popisu každé lodi jsou její rychlost a rychlost otáčení. Na každé následující řádce je název modulu (definovaného v souboru modulů) a posloupnost čísel, která udávají pozici, na níž je tento modul umístěn. Například „MediumSteelArmor 0 0 0 2 0 4“ by označovalo 3 střední ocelová brnění umístěná nad sebou, s levými spodními rohy na pozicích (0,0), (0,2) a (0,4).
+
+Soubor popisu bitvy obsahuje globální bonusy, které platí po celou dobu hry, jako například „Armor Health 0.2“, což zvýší zdraví všech brnění o 20 %. Obsahuje také bonusy specifické pro každého hráče, které se vztahují na moduly v jeho flotile. Každý modul má unikátní bonus, který bude aktivní, dokud má vaše flotila alespoň jeden tento modul. Tyto bonusy se navzájem sčítají. Pokud tímto vlastnost dosáhne záporné hodnoty, výsledek není definován.
+
+Aktuálně modifikovatelné vlastnosti jsou [Health, Damage, Armor, Reflect, Firerate, Mass, EnergyUse, EnergyGen, Range, WarpForce, RepairRate, MaxRepair, FiringArc, Thrust, TurnThrust, Strength, MaxRegen, RegenRate, ShieldRadius, ExplosionRadius, JunkHealth, AfterburnerThrust, AfterburnerTurning],
+
+A kategorie modulů, na které lze tyto modifikace aplikovat, jsou [Any, Armor, Weapon, Shield, Ballistic, Missile, Laser, RepairBay, Engine, Junk, PointDefense, Reactor].
+
+Některé kombinace ale nebudou mít žádný efekt, například „Armor RepairRate x“ (brnění nemůže nic opravovat).
+
+# Spuštění programu
+
+Když jsou soubory modulů a lodí připraveny, můžete zkusit spustit program s grafikou. V tomto případě by příkaz byl "./SaSimulator.exe -G -F testFile.txt -M modules.txt". Mělo by se objevit okno se simulací jedné bitvy a poté zavřít. Grafický režim je užitečný především pro ověření, že vše funguje správně a lodě jsou nastaveny, jak by měly být.
+
+Pokud nenastavíte -G, simulace bude fungovat stejně, ale výsledek uvidíte okamžitě v příkazovém řádku.
+
+# Další argumenty příkazové řádky
+
+Mechaniky hry Space Arena a výsledky bitev mohou záviset na frekvenci herních tiků, použijte -D pro nastavení počtu sekund na jeden herní tik. Vyšší hodnoty mohou také simulaci urychlit.
+
+-T specifikuje čas v sekundách, po kterém bude bitva považována za nerozhodnou a nebude přispívat do výpočtu výherního poměru. Takováto mechanika ve Space Arena neexistuje. Dlouhé bitvy jsou obvykle způsobeny tím, že obě lodě přežívají v těžce poškozeném stavu a nejsou schopné se pořádně zasáhnout, což znamená, že jsou víc nebo méně vyrovnané, a pokračování simulace po neomezeně dlouhou dobu by mohlo zbytečně plýtvat výpočetní sílu.
+
+Pokud používáte -G, může být užitečné nastavit rychlost hry pomocí -S, třeba vše zpomalit a lépe si prohlédnout, co se děje.
+
+Pokud nepoužíváte grafiku, můžete specifikovat počet bitev k simulaci pomocí -N. Tyto bitvy budou provedeny co nejrychleji pomocí paralelního programování.

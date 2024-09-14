@@ -50,6 +50,9 @@ namespace SaSimulator
             return rel > 0 ? middle + maxDeviation : middle - maxDeviation;
         }
 
+        /// <summary>
+        /// position and rotation.
+        /// </summary>
         public readonly struct Transform
         {
             public readonly Distance x, y;
@@ -85,8 +88,8 @@ namespace SaSimulator
             public Transform RelativeTo(Transform other)
             {
                 float cos = (float)Math.Cos(other.rotation), sin = (float)Math.Sin(other.rotation);
-                Distance dx = this.x - other.x, dy = this.y - other.y;
-                return new Transform(dx * cos + dy * sin, dx * (-sin) + dy * cos, this.rotation - other.rotation);
+                Distance dx = x - other.x, dy = y - other.y;
+                return new Transform(dx * cos + dy * sin, dx * (-sin) + dy * cos, rotation - other.rotation);
             }
         }
     }

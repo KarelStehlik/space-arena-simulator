@@ -1,0 +1,27 @@
+# Přehled
+
+Používáme "CommandLineParser" pro zpracování argumentů a následně FileLoading.cs pro načtení informací z daných souborů modulů a bitvy.
+
+Tyto informace předáme nové instanci třídy Game a voláme její metodu Tick(), dokud nedojde ke konci bitvy (game.Result se změní z Game.GameResult.unfinished). Proces vytvoření a spuštění instance třídy Game nemá žádné vedlejší účinky, což znamená, že není problém spouštět více her paralelně. Alternativně můžeme otevřít okno MonoGame pro zobrazení jedné bitvy. Třída Game a herní objekty mají metodu Draw(), která se volá pouze v případě, že je zapnuta grafika. Toto nemusí být nijak zvlášť rychlé, pro rychlé simulace máme režim bez grafiky.
+
+Třída Game nejprve vytvoří všechny lodě obou hráčů, poté při každém volání Tick() zkontroluje, zda bitva neskončila, naplní systém detekce kolizí, vyvolá Tick() na herních objektech které spravuje a odstraní ty zničené. Herní objekty mohou vytvářet další objekty pomocí Game.AddObject() (např. zbraně vytvářející projektily) a interagovat s ostatními objekty dotazováním relevantní struktury pro detekci kolizí (např. projektily hráče 0 dotazují Game.hittableP1).
+
+Stav hry je převážně uložen v herních objektech. Ty dědí ze třídy GameObject, což znamená, že všechny mají světovou pozici, referenci zpět na hru, příznak indikující, zda jsou zničeny, mohou požádat o přidání do detekce kolizí pomocí BelongsToGrid() a mohou překrýt zděděnou metodu Draw() pro grafiku nebo Tick().
+
+# Aktuální herní objekty
+
+## Lodě (Ship) a moduly (Module)
+
+Každá loď se skládá z modulů uspořádaných v čtvercové mřížce, které inicializuje pomocí ModuleCreation.cs. V tomto simulátoru je tvar lodi určen výhradně jejími moduly. Při každém herním tiku aktualizuje a tikne všechny své moduly, které mohou vlastní metodou Tick() provádět různé akce, jako například střílení projektilů na nepřítele nebo léčení přátelských modulů. Moduly jsou spravovány lodí, ke které patří, nikoliv samotnou hrou.
+
+## JunkPiece
+
+"Junk" je jednoduchý herní objekt, který existuje po určitou dobu a může blokovat nepřátelské projektily.
+
+## Projektily
+
+Projektily mají metodu Tick(), ve které se pohybují a sráží se s nepřátelskými loděmi (a s Junk objekty) po cestě, přičemž způsobují poškození. Pokud je grafika zapnuta, projektily také zanechávají za sebou "BulletTrail", což je čistě vizuální herní objekt. Aktuální projektily zahrnují základní, rakety, které sledují cíl a způsobují AoE poškození při kontaktu s lodí, a lasery, které obchází štíty a celý let provedou v jednom tiku.
+
+# Problémy s přesností simulace
+
+Nemám zdrojový kód hry Space Arena, tento simulátor je pouze přibližnou verzí. Některé herní mechaniky se budou chovat odlišně. Části kódu, které řídí mechaniky, jež nemusí být zcela přesné, u sebe mají komentíř "[speculative game mechanic]".

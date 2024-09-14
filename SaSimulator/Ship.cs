@@ -461,7 +461,8 @@ namespace SaSimulator
             Vector2 step = new Vector2((float)Math.Cos(ray.rotation), (float)Math.Sin(ray.rotation)) * stepSize;
             Vector2 pos = ray.Position - lowestCorner;
 
-            // commence simple search
+            // [speculative game mechanic] this algorithm can indeed lead to damage passing between two modules sharing a corner.
+            // That is the case in Space Arena as well, however it may be more or less common or work slightly differently. 
             for (int i = 0; i * stepSize <= rayLength.Cells; i++)
             {
                 if (pos.X > 0 && (int)pos.X < width && pos.Y > 0 && (int)pos.Y < height)

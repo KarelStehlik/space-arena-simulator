@@ -21,3 +21,7 @@ Junk is a simple game object that exists for some duration and can block enemy p
 ## Projectiles
 
 Projectiles have a Tick() method where they will move and collide with enemy ships (and junk) on the way, dealing damage. If graphics are on, projectiles will also leave behind a BulletTrail, which is a purely visual game object. Current projectiles are basic ones (that is ballistics), missiles which follow the target and do AoE damage on contact with a ship, and lasers which bypass shields and travel instantly.
+
+# Simulation accuracy issues
+
+I do not have the source code of Space Arena, this simulator is only an approxximation. Some game mechanics are going to behave differently. Sections of code which control mechanics that may not be quite accurate are commented with "[speculative game mechanic]".

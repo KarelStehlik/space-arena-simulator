@@ -6,12 +6,22 @@ using static SaSimulator.Ship;
 
 namespace SaSimulator
 {
-    // This always has a sprite, as bullet trails only exist when graphics are enabled
+    /// <summary>
+    /// These objects should only ever exist when graphics are enabled. Graphics is their only function. 
+    /// </summary>
     internal class BulletTrail : GameObject
     {
         readonly Sprite sprite;
         Time duration;
 
+        /// <summary>
+        /// creates a bullet trail between two given points in world space.
+        /// </summary>
+        /// <param name="game"></param>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="color"></param>
+        /// <param name="duration"></param>
         public BulletTrail(Game game, Vector2 from, Vector2 to, Color color, Time duration) : base(game)
         {
             this.duration = duration;
@@ -38,6 +48,7 @@ namespace SaSimulator
             sprite.Draw(batch);
         }
     }
+
 
     internal class Projectile : GameObject
     {

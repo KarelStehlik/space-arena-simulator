@@ -1,7 +1,9 @@
-﻿// A bunch of this is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
-using System;
+﻿using System;
 using System.Numerics;
 
+/// A bunch of this is taken from my solution to 01-Physics. But technically it is 100% code that i wrote myself.
+/// Sometimes it is annoying having to convert to and from these units, however i feel they do add some clarity
+/// compared to just using floats for everything, and they have saved me at least 1 bug.
 namespace SaSimulator
 {
     public readonly struct Distance(float cells) : IMultiplyOperators<Distance, float, Distance>

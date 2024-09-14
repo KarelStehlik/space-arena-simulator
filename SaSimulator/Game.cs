@@ -105,7 +105,7 @@ namespace SaSimulator
         public Time Time { get; private set; } = 0.Seconds();
         public readonly Time timeout = timeout;
         public readonly Random rng = new(randomSeed);
-        public readonly UniformGrid hittableP0 = new(1), hittableP1 = new(1), missilesP1 = new(10), missilesP0 = new(10); // collision detection data structures
+        public readonly UniformGrid hittableP0 = new(10), hittableP1 = new(10), missilesP1 = new(10), missilesP0 = new(10); // collision detection data structures
         public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
                                                               // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
 
