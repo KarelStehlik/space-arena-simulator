@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using System.Numerics;
 
 namespace SaSimulator
@@ -13,7 +14,7 @@ namespace SaSimulator
         // Angle between the 2 angles, normalized to 0-2PI
         private static float RelativeAngle(float firstAngle, float secondAngle)
         {
-            return (float)((secondAngle - firstAngle + 4 * Math.PI) % (2 * Math.PI));
+            return (float)((secondAngle - firstAngle + 8 * Math.PI) % (2 * Math.PI));
         }
 
         public static bool IsPointInCone(Vector2 point, Vector2 coneOrigin, float coneRotation, float coneAngle)
@@ -24,19 +25,20 @@ namespace SaSimulator
             return rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2;
         }
 
-        public static bool ConeCircleIntersect(Vector2 circleCenter, float circleRadius, Vector2 coneOrigin, float coneRotation, float coneAngle)
+        public static bool ConeCircleIntersect(Vector2 circleCenter, float circleRadius, Transform coneOrigin, float coneAngle)
         {
-            Vector2 difference = circleCenter - coneOrigin;
-            float angle = (float)Math.Atan2(difference.Y, difference.X);
-            float rel = RelativeAngle(angle, coneRotation);
-            if (rel < coneAngle / 2 || rel > 2 * Math.PI - coneAngle / 2) // circle center is in cone
+            Vector2 center = circleCenter.RelativeTo(coneOrigin);
+            float angle = (float)Math.Atan2(center.Y, center.X);
+            float dist = center.Length();
+
+            if(dist<circleRadius)
             {
                 return true;
             }
-            float dist = Vector2.Distance(circleCenter, coneOrigin);
-            float angleOfClosestEdgeToCircle = Math.Min(RelativeAngle(angle, coneRotation + coneAngle), RelativeAngle(angle, coneRotation - coneAngle));
-            return dist * Math.Abs(Math.Sin(angleOfClosestEdgeToCircle)) < circleRadius;
 
+            float maxAllowedAngle = coneAngle / 2 + (float)Math.Asin(circleRadius / dist);
+
+            return angle < maxAllowedAngle && angle > -maxAllowedAngle;
         }
 
         // clamp an angle so that it differs by at most [maxDeviation] from [middle]
@@ -47,7 +49,7 @@ namespace SaSimulator
             {
                 return angle;
             }
-            return rel > 0 ? middle + maxDeviation : middle - maxDeviation;
+            return rel < Math.PI ? middle + maxDeviation : middle - maxDeviation;
         }
 
         /// <summary>

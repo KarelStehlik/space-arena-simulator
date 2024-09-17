@@ -381,7 +381,7 @@ namespace SaSimulator
                 foreach (Module module in thisModule.ship.modules)
                 {
                     float healed = module.Heal(repairAmount);
-                    if (healed > 0)
+                    if (healed > 0.0001)
                     {
                         repairPartRemaining -= healed / maxRepair;
                         remainingRepairs--;
@@ -492,8 +492,8 @@ namespace SaSimulator
 
             private bool CanTarget(Ship ship, Module thisModule)
             {
-                return !ship.IsDestroyed && Vector2.Distance(ship.WorldPosition.Position, thisModule.WorldPosition.Position) < (float)(range.Value.Cells) &&
-                       ConeCircleIntersect(ship.WorldPosition.Position, ship.size.Cells, thisModule.WorldPosition.Position, thisModule.WorldPosition.rotation, firingArc);
+                return !ship.IsDestroyed && Vector2.Distance(ship.WorldPosition.Position, thisModule.WorldPosition.Position) < range.Value.Cells &&
+                       ConeCircleIntersect(ship.WorldPosition.Position, ship.size.Cells*0.6f, thisModule.WorldPosition, firingArc);
             }
 
             protected Ship? GetTarget(Module thisModule)

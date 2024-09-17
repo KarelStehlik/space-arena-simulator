@@ -315,7 +315,7 @@ namespace SaSimulator
     internal class Mine(Game game, Transform transform, Speed speed, Time duration, float radius, float damage, int side, Color color) :
         Missile(game, transform, speed, duration, radius, damage, side, color, null, 0)
     {
-        private static readonly float SPEED_DAMPING = 0.9f;
+        private static readonly float SPEED_DAMPING = 0.3f;
 
         public override void Tick(Time dt)
         {
@@ -329,6 +329,10 @@ namespace SaSimulator
             Sprite sprite = new("mine") { Size = new(1.5f, 1.5f) };
             sprite.SetTransform(WorldPosition);
             sprite.Draw(batch);
+        }
+
+        protected override void DrawTrail()
+        {
         }
     }
 
