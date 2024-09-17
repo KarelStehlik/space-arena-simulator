@@ -563,6 +563,10 @@ namespace SaSimulator
                 ammo = ammo > maxAmmo ? maxAmmo : ammo;
 
                 Ship? target = GetTarget(thisModule);
+                if (target == null)
+                {
+                    isBurstFire = false;
+                }
 
                 int bulletsToFire = 0;
                 if (isBurstFire)
