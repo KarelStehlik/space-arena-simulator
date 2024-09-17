@@ -151,7 +151,7 @@ namespace SaSimulator
                                              // https://youtube.com/shorts/hxgPU1mlzhA?feature=share
             {
                 Time travelTime = hit.traveled / speed;
-                Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells));
+                Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).to;
                 transferTo?.TakeDamage(damage, DamageType.Ballistics);
                 IsDestroyed = true;
                 return;
@@ -227,7 +227,7 @@ namespace SaSimulator
             if (hit.cell.module.IsDestroyed)
             {
                 Time travelTime = hit.traveled / speed;
-                Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells));
+                Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells)).to;
                 transferTo?.TakeDamage(damage, DamageType.Laser);
                 IsDestroyed = true;
                 return;
@@ -291,10 +291,10 @@ namespace SaSimulator
             if (hit.cell.module.IsDestroyed)
             {
                 Time travelTime = hit.traveled / speed;
-                Module? transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells));
-                if (transferTo != null)
+                var transferTo = target.GetNearestModule(new((WorldPosition.x + vx * travelTime).Cells, (WorldPosition.y + vy * travelTime).Cells));
+                if (transferTo.to != null)
                 {
-                    explosionOrigin = transferTo.WorldPosition.Position;
+                    explosionOrigin = transferTo.worldPos;
                 }
             }
             target.TakeAoeDamage(explosionOrigin, radius.Cells(), damage, DamageType.Explosive);

@@ -39,7 +39,7 @@ namespace SaSimulator
         }
 
         private static readonly float MOVEMENT_DAMPENING = 0.75f;
-        private static readonly float ROTATION_DAMPENING = 0.1f;
+        private static readonly float ROTATION_DAMPENING = 0.05f;
         private static readonly Time MIN_WARP_TIME = 5.Seconds(); // [speculative game mechanics] The time between warps is [this constant] + [cell count] / [sum of warp force]
 
         private readonly Cell[,] cells; // for each cell in this ship's grid, stores which module lies in this cell and any shields covering it there.
@@ -145,9 +145,16 @@ namespace SaSimulator
             return energyPhase * energyUse < energy;
         }
 
-        public Module? GetNearestModule(Vector2 worldPosition)
+        public struct HitTransfer(Module? m, Vector2 worldPos)
+        {
+            public readonly Module? to = m;
+            public readonly Vector2 worldPos = worldPos;
+        }
+
+        public HitTransfer GetNearestModule(Vector2 worldPosition)
         {
             Module? best = null;
+            Vector2 origin = worldPosition.RelativeTo(WorldPosition);
             float bestDistance = float.PositiveInfinity;
             foreach (Module module in modules)
             {
@@ -155,14 +162,22 @@ namespace SaSimulator
                 {
                     continue;
                 }
-                float dist = Vector2.DistanceSquared(worldPosition, module.WorldPosition.Position);
+                float dist = Math.Abs(origin.X-module.relativePosition.x.Cells) + Math.Abs(origin.Y - module.relativePosition.y.Cells) - (module.width+module.height)/2;
                 if (dist < bestDistance)
                 {
                     best = module;
                     bestDistance = dist;
                 }
             }
-            return best;
+            if (best == null)
+            {
+                return new(null, new());
+            }
+            Vector2 RelHitPos = new(
+                Math.Clamp(origin.X, best.relativePosition.x.Cells - best.width / 2f, best.relativePosition.x.Cells + best.width / 2f),
+                Math.Clamp(origin.Y, best.relativePosition.y.Cells - best.height / 2f, best.relativePosition.y.Cells + best.height / 2f)
+                );
+            return new(best, WorldPosition + RelHitPos);
         }
 
         public void ApplyModuleBuff(ModuleBuff buff)

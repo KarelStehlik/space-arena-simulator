@@ -144,7 +144,7 @@ namespace SaSimulator
             ship.modulesAlive--;
             ship.weaponsAlive -= isWeapon ? 1 : 0;
             ship.energyModulesAlive -= isPower ? 1 : 0;
-            ship.mass -= mass; // [speculative game mechanic] it is unknown whether ships lose mass when modules are destroyed.
+            //ship.mass -= mass; // [speculative game mechanic] it is unknown whether ships lose mass when modules are destroyed.
         }
 
         // Return healing done
@@ -339,7 +339,7 @@ namespace SaSimulator
                 if (currentPhaseRemainingDuration.Seconds < 0)
                 {
                     active = !active;
-                    currentPhaseRemainingDuration = active ? duration : 5.Seconds() * (1 + (float)thisModule.game.rng.NextDouble());
+                    currentPhaseRemainingDuration = active ? duration : 15.Seconds() * (1 + (float)thisModule.game.rng.NextDouble());
                 }
                 if (active)
                 {
@@ -678,11 +678,22 @@ namespace SaSimulator
             Distance range, float firingArc,
             float damage) : Gun(range, firingArc, 0, damage, fireRate)
         {
-            Time duration = duration;
+            protected Time duration = duration;
             bool currentlyFiring = false;
-            Time currentPhaseRemainingDuration = 0.Seconds();
+            protected Time currentPhaseRemainingDuration = 0.Seconds();
 
             public override ModuleTag[] Tags() => [ModuleTag.Weapon, ModuleTag.Laser];
+
+            protected virtual float GetCurrentDps()
+            {
+                return damage;
+            }
+
+            protected void Fire(Module thisModule, float currentDps, Time dt)
+            {
+                Transform position = new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule));
+                thisModule.game.AddObject(new Laser(thisModule.game, position, range, currentDps * dt.Seconds, thisModule.ship.side, thisModule.ship.side == 0 ? Color.LightBlue : Color.Red));
+            }
 
             public override void Tick(Time dt, Module thisModule)
             {
@@ -714,14 +725,21 @@ namespace SaSimulator
 
                 // firing and in range
                 currentPhaseRemainingDuration -= dt;
-                Transform position = new(thisModule.WorldPosition.x, thisModule.WorldPosition.y, Aim(thisModule));
-                thisModule.game.AddObject(new Laser(thisModule.game, position, this.range, damage * (float)dt.Seconds, thisModule.ship.side, thisModule.ship.side == 0 ? Color.LightBlue : Color.Red));
+                Fire(thisModule, damage, dt);
 
                 if (currentPhaseRemainingDuration.Seconds <= 0)
                 {
                     currentPhaseRemainingDuration = (1 / fireRate).Seconds();
                     currentlyFiring = false;
                 }
+            }
+        }
+
+        public class FusionLaser(float fireRate, Time duration, Distance range, float firingArc, float damage) : LaserGun(fireRate, duration, range, firingArc, damage)
+        {
+            protected override float GetCurrentDps()
+            {
+                return 1 - currentPhaseRemainingDuration / duration;
             }
         }
 
