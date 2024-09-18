@@ -769,7 +769,7 @@ namespace SaSimulator
 
         public class PointDefense(float fireRate, float missileInterceptChance, float torpedoInterceptChance, float mineInterceptChance, Distance range) : ModuleComponent
         {
-            float sireRate = fireRate, missileChance = missileInterceptChance, torpedoChance = torpedoInterceptChance, mineChance = mineInterceptChance;
+            float fireRate = fireRate, missileChance = missileInterceptChance, torpedoChance = torpedoInterceptChance, mineChance = mineInterceptChance;
             float loaded = 0;
             Attribute<Distance> range = new(range);
 
@@ -786,13 +786,12 @@ namespace SaSimulator
 
             public override void Tick(Time dt, Module thisModule)
             {
-                loaded += sireRate * dt.Seconds;
+                loaded += fireRate * dt.Seconds;
                 if (loaded >= 1)
                 {
                     loaded = 0; // [speculative game mechanic] it is known that point defense is less effective at low frame rates.
                                 // this is one possible way to simulate that - it can shoot at most once per game tick.
 
-                    // fire
                     UniformGrid targets = thisModule.ship.side == 0 ? thisModule.game.missilesP1 : thisModule.game.missilesP0;
                     foreach (var target in targets.Get(thisModule.WorldPosition.x, thisModule.WorldPosition.y, range))
                     {

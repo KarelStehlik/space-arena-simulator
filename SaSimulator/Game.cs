@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
@@ -108,21 +109,23 @@ namespace SaSimulator
         public readonly UniformGrid hittableP0 = new(10), hittableP1 = new(10), missilesP1 = new(10), missilesP0 = new(10); // collision detection data structures
         public float DamageScaling { get; private set; } = 1; // [speculative game mechanic] it is clear that all damage ramps up over time.
                                                               // according to Discord, this increase is increases by 3% per second starting at 25 seconds.
+        private static int gameId = 0;
+
+        private void LoadPlayer(int side)
+        {
+            foreach (ShipInfo shipInfo in side==0?player0ShipList: player1ShipList)
+            {
+                Ship ship = new(shipInfo, this, side);
+                (side==0?player0:player1).ships.Add(ship);
+                gameObjects.Add(ship);
+            }
+        }
 
         public void Load()
         {
-            foreach (ShipInfo shipInfo in player0ShipList)
-            {
-                Ship ship = new(shipInfo, this, 0);
-                player0.ships.Add(ship);
-                gameObjects.Add(ship);
-            }
-            foreach (ShipInfo shipInfo in player1ShipList)
-            {
-                Ship ship = new(shipInfo, this, 1);
-                player1.ships.Add(ship);
-                gameObjects.Add(ship);
-            }
+            int randPlayer = Interlocked.Increment(ref gameId)%2;
+            LoadPlayer(randPlayer);
+            LoadPlayer(1-randPlayer);
             player0.ApplyAllBuffs();
             player1.ApplyAllBuffs();
         }

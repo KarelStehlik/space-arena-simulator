@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using static SaSimulator.Physics;
 
 namespace SaSimulator
@@ -18,6 +19,11 @@ namespace SaSimulator
         // However, it made more sense for me to have the ship facing forward so from its reference frame "forward" would be angle 0, that is positive X
         // This conversion happens here.
         public readonly int x = y, y = x;
+
+        public override string ToString()
+        {
+            return $"Module: {module} x {x} y {y}";
+        }
     }
 
     /// <summary>
@@ -28,6 +34,11 @@ namespace SaSimulator
         public Speed speed = 1.CellsPerSecond();
         public float turnSpeed = 0.1f;
         public List<ModulePlacement> modules = [];
+
+        public override string ToString()
+        {
+            return modules.Select(x=>x.ToString()).Aggregate((s1,s2)=>s1+", "+s2);
+        }
     }
 
     internal class Ship : GameObject
@@ -206,10 +217,16 @@ namespace SaSimulator
         }
 
         private enum MovementAction { Forward, Retreat, CircleLeft, CircleRight };
-        private static MovementAction[] possibleMoveActions = Enum.GetValues(typeof(MovementAction)).OfType<MovementAction>().ToArray();
+
+        private static List<WeightedRecord<MovementAction>> possibleMoveActions = [
+            new(MovementAction.Forward, 2f),
+            new(MovementAction.Retreat, 1),
+            new(MovementAction.CircleRight, 0.5f),
+            new(MovementAction.CircleLeft, 0.5f),
+            ];
         private Time movementActionRemainingDuration = 2.Seconds();
         private MovementAction currentAction = MovementAction.Forward;
-        private static readonly Time movementActionMaxDuration = 2f.Seconds();
+        private static readonly Time movementActionMaxDuration = 1.5f.Seconds();
         // [speculative game mechanic] Ships always turn towards the enemy main,
         // however that is all we really know about movement patterns.
         // sometimes they rush forward, sometimes they fly away and sometimes they try to circle it.
@@ -263,10 +280,10 @@ namespace SaSimulator
             if (movementActionRemainingDuration.Seconds <= 0)
             {
                 movementActionRemainingDuration = movementActionMaxDuration;
-                currentAction = possibleMoveActions[game.rng.Next(possibleMoveActions.Length)];
+                currentAction = WeightedChoice(possibleMoveActions, game.rng);
                 float distanceToEnemyMain = Vector2.Distance(enemyMain.WorldPosition.Position, WorldPosition.Position);
-                if (currentAction == MovementAction.Retreat && distanceToEnemyMain > maxWeaponRange.Cells * 0.8f ||
-                    distanceToEnemyMain > maxWeaponRange.Cells * 1.2f)
+                if (currentAction == MovementAction.Retreat && distanceToEnemyMain > maxWeaponRange.Cells * 0.7f ||
+                    distanceToEnemyMain > maxWeaponRange.Cells * 1f)
                 {
                     currentAction = MovementAction.Forward; // if enemy main is past weapon range, we don't retreat
                 }

@@ -1,11 +1,35 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Net.NetworkInformation;
 using System.Numerics;
+using System.Runtime.ConstrainedExecution;
 
 namespace SaSimulator
 {
     internal static class Physics
     {
+        public struct WeightedRecord<T>(T item, float weight)
+        {
+            public readonly T item = item;
+            public readonly float weight = weight;
+        }
+
+        public static T WeightedChoice<T>(List<WeightedRecord<T>> records, Random rng)
+        {
+            float roll = (float)rng.NextDouble() * records.Select(r => r.weight).Sum();
+            foreach(WeightedRecord<T> record in records)
+            {
+                if(record.weight > roll)
+                {
+                    return record.item;
+                }
+                roll -= record.weight;
+            }
+            return records.Last().item;
+        }
+
         public static float Square(float x)
         {
             return x * x;
