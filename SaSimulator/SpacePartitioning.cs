@@ -170,11 +170,11 @@ namespace SaSimulator
         public IEnumerable<GameObject> Get(Transform origin, Distance length)
         {
             searchId++;
-            float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation); //-.2, +.8
+            float sin = (float)Math.Sin(origin.rotation), cos = (float)Math.Cos(origin.rotation);
 
             bool steppingY = Math.Abs(sin) > Math.Abs(cos);  //false
 
-            Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));  // (1, -0.1)
+            Vector2 step = steppingY ? new(cos / sin * (chunkHeight / chunkWidth), 1) : new(1, sin / cos * (chunkWidth / chunkHeight));
 
             if ((!steppingY && cos < 0) || (steppingY && sin<0))
             {
@@ -183,7 +183,7 @@ namespace SaSimulator
 
             Distance stepSize = (steppingY ? chunkHeight : chunkWidth) * step.Length();
 
-            Vector2 chunkCoords = new((origin.x - x) / chunkWidth, (origin.y - y) / chunkHeight);   // 50,50
+            Vector2 chunkCoords = new((origin.x - x) / chunkWidth, (origin.y - y) / chunkHeight);
             
             // align chunk coordinates to the edge of a chunk
             if (steppingY)

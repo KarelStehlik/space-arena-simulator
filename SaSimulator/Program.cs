@@ -160,7 +160,7 @@ namespace SaSimulator
             {
                 game.Tick();
             }
-                info.results.CompleteGame(game.Result);
+            info.results.CompleteGame(game.Result);
         }
 
         static void Main(string[] args)
